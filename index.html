@@ -49,7 +49,7 @@
         <script type="module">
 
             import { auth, db } from "./firebase.js";
-            import { createUserWithEmailAndPassword, signInWithEmailAndPassword }
+            import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut }
                 from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
             import { doc, setDoc, getDoc }
                 from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
@@ -148,7 +148,7 @@
                     const selectedRole = document.getElementById("role").value;
 
                     if (userData.role !== selectedRole) {
-                        await auth.signOut();
+                        await signOut(auth);
                         alert("This email is registered as a " + userData.role + ". You cannot log in as a " + selectedRole + ".");
                         return;
                     }

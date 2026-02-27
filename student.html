@@ -414,7 +414,7 @@
 
         async function onScanSuccess(decodedText, decodedResult) {
             const eventId = decodedText.trim();
-            html5QrcodeScanner.clear(); // Stop scanning 
+            await html5QrcodeScanner.clear(); // Stop scanning 
             document.getElementById("startEventScanBtn").style.display = "inline-block";
             document.getElementById("closeEventScanBtn").style.display = "none";
 
