@@ -190,11 +190,7 @@
         }
 
         function startSessionTracking(duration) {
-            const now = new Date();
-            const sessionEnd = activeSession.endTime?.seconds
-                ? new Date(activeSession.endTime.seconds * 1000)
-                : new Date(activeSession.endTime);
-            let remaining = Math.max(0, Math.floor((sessionEnd - now) / 1000));
+            let remaining = duration;
             const timerElement = document.getElementById("studentTimer");
             timerElement.innerText = remaining + " sec";
 
