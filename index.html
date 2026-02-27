@@ -2,10 +2,9 @@
 <html>
 
 <head>
+    <meta charset="UTF-8">
     <title>SmartEdu ID - Login</title>
     <link rel="stylesheet" href="style.css">
-
-
 </head>
 
 <body>
@@ -21,16 +20,165 @@
             <input type="password" id="password" placeholder="Enter Password">
 
             <select id="role">
+                <option value="select">Select Role</option> <!--thiis is just for UI-->
                 <option value="student">Student</option>
                 <option value="teacher">Teacher</option>
             </select>
 
             <button onclick="login()">Login</button>
             <button onclick="register()">Register</button>
-        </div>
-    </div>
 
-    <script type="module" src="script.js"></script>
+            <div id="studentFields" style="display: none;">
+                <input type="text" id="studentNameInput" placeholder="Full Name">
+                <input type="text" id="address" placeholder="Address">
+                <input type="date" id="dob">
+                <select id="bloodGroup">
+                    <option value="">Select Blood Group</option>
+                    <option value="A+">A+</option>
+                    <option value="A-">A-</option>
+                    <option value="B+">B+</option>
+                    <option value="B-">B-</option>
+                    <option value="AB+">AB+</option>
+                    <option value="AB-">AB-</option>
+                    <option value="O+">O+</option>
+                    <option value="O-">O-</option>
+                </select>
+            </div>
+        </div>
+
+        <script type="module">
+
+            import { auth, db } from "./firebase.js";
+            import { createUserWithEmailAndPassword, signInWithEmailAndPassword }
+                from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
+            import { doc, setDoc, getDoc }
+                from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+
+            window.register = async function () {
+
+                const email = document.getElementById("email").value;
+                const password = document.getElementById("password").value;
+                const role = document.getElementById("role").value;
+
+                if (role === "select") {
+                    alert("Please select a role.");
+                    return;
+                }
+
+                if (!email) {
+                    alert("Please enter the email.");
+                    return;
+                }
+
+                if (!password) {
+                    alert("Please enter the password.");
+                    return;
+                }
+
+                if (role === "student") {
+                    const name = document.getElementById("studentNameInput").value;
+                    const address = document.getElementById("address").value;
+                    const dob = document.getElementById("dob").value;
+                    const bloodGroup = document.getElementById("bloodGroup").value;
+
+                    if (!name || !address || !dob || !bloodGroup) {
+                        alert("Please fill all the fields.");
+                        return;
+                    }
+                }
+
+                try {
+                    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+
+                    const userData = {
+                        email: email,
+                        role: role
+                    };
+
+                    if (role === "student") {
+                        userData.name = document.getElementById("studentNameInput").value;
+                        userData.address = document.getElementById("address").value;
+                        userData.dob = document.getElementById("dob").value;
+                        userData.bloodGroup = document.getElementById("bloodGroup").value;
+                    }
+
+                    await setDoc(doc(db, "users", userCredential.user.uid), userData);
+
+                    alert("Registered Successfully!");
+
+                } catch (error) {
+                    if (error.code === "auth/email-already-in-use") {
+                        alert("Email is already registered.");
+                    } else {
+                        alert(error.message);
+                    }
+                    console.error(error);
+                }
+            }
+
+            window.login = async function () {
+
+                const email = document.getElementById("email").value;
+                const password = document.getElementById("password").value;
+                const role = document.getElementById("role").value;
+
+                if (role === "select") {
+                    alert("Please select a role.");
+                    return;
+                }
+
+                if (!email) {
+                    alert("Please enter the email.");
+                    return;
+                }
+
+                if (!password) {
+                    alert("Please enter the password.");
+                    return;
+                }
+
+                try {
+                    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                    const uid = userCredential.user.uid;
+
+                    const docRef = doc(db, "users", uid);
+                    const docSnap = await getDoc(docRef);
+
+                    const userData = docSnap.data();
+                    const selectedRole = document.getElementById("role").value;
+
+                    if (userData.role !== selectedRole) {
+                        await auth.signOut();
+                        alert("This email is registered as a " + userData.role + ". You cannot log in as a " + selectedRole + ".");
+                        return;
+                    }
+
+                    if (userData.role === "teacher") {
+                        window.location.href = "teacher.html";
+                    } else {
+                        window.location.href = "student.html";
+                    }
+
+                } catch (error) {
+                    if (error.code === "auth/invalid-credential") {
+                        alert("You have not registered yet. Please register yourself first.");
+                    } else {
+                        alert(error.message);
+                    }
+                    console.error(error);
+                }
+            }
+
+            // Show/hide student fields based on role
+            document.getElementById("role").addEventListener("change", function () {
+                const fields = document.getElementById("studentFields");
+                fields.style.display = this.value === "student" ? "block" : "none";
+            });
+
+        </script>
+
+
+    </div>
 </body>
 
 </html>
