@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Student Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <div class="container">
+        <h1>Student Dashboard</h1>
+
+        <div class="card">
+            <h2>Digital ID</h2>
+            <p>Name: <span id="studentName">Student Name</span></p>
+            <p>Email: <span id="studentEmail">student@email.com</span></p>
+        </div>
+
+        <div class="card">
+            <h2>Attendance</h2>
+            <button onclick="checkLocation()">Check Classroom Presence</button>
+            <p id="attendanceStatus">Status: Not Checked</p>
+        </div>
+
+        <div class="card">
+            <h2>Activities</h2>
+            <button onclick="scanQR()">Scan Activity QR</button>
+        </div>
+
+        <button class="logout" onclick="logout()">Logout</button>
+    </div>
+
+    <script type="module" src="script.js"></script>
+</body>
+
+</html>
