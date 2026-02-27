@@ -49,33 +49,13 @@
 
         <script type="module">
 
-            import { auth, db } from "./firebase.js";
+            import { auth, db, storage } from "./firebase.js";
             import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut }
                 from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
             import { doc, setDoc, getDoc }
                 from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
-
-            // Resize & convert image file to a base64 string (max 300x300, JPEG)
-            function resizeImageToBase64(file) {
-                return new Promise((resolve) => {
-                    const reader = new FileReader();
-                    reader.onload = function (e) {
-                        const img = new Image();
-                        img.onload = function () {
-                            const MAX = 300;
-                            let w = img.width, h = img.height;
-                            if (w > h) { if (w > MAX) { h = h * MAX / w; w = MAX; } }
-                            else { if (h > MAX) { w = w * MAX / h; h = MAX; } }
-                            const canvas = document.createElement("canvas");
-                            canvas.width = w; canvas.height = h;
-                            canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-                            resolve(canvas.toDataURL("image/jpeg", 0.7));
-                        };
-                        img.src = e.target.result;
-                    };
-                    reader.readAsDataURL(file);
-                });
-            }
+            import { ref, uploadBytes, getDownloadURL }
+                from "https://www.gstatic.com/firebasejs/12.9.0/firebase-storage.js";
 
             window.register = async function () {
 
@@ -137,10 +117,16 @@
                         userData.address = document.getElementById("address").value;
                         userData.dob = document.getElementById("dob").value;
                         userData.bloodGroup = document.getElementById("bloodGroup").value;
-
                         const imageFile = document.getElementById("profileImage").files[0];
                         if (imageFile) {
-                            userData.photoURL = await resizeImageToBase64(imageFile);
+                            try {
+                                const storageRef = ref(storage, `studentImages/${userCredential.user.uid}.jpg`);
+                                await uploadBytes(storageRef, imageFile);
+                                userData.photoURL = await getDownloadURL(storageRef);
+                            } catch (uploadError) {
+                                console.error("Error uploading profile image:", uploadError);
+                                alert("Account created, but profile image upload failed. " + uploadError.message);
+                            }
                         }
                     }
 
