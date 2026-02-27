@@ -18,22 +18,39 @@
         <div class="card">
             <h2>Create Session</h2>
             <input type="number" id="radius" placeholder="Enter Radius (meters)">
-            <input type="number" id="duration" placeholder="Lecture Duration (seconds)">
+            <input type="number" id="duration" placeholder="Lecture Duration (Minutes)">
             <button onclick="createSession()">Start Session</button>
         </div>
 
-        <div class="card">
-            <h2>Activity QR</h2>
-            <input type="text" id="activityName" placeholder="Activity Name">
-            <button onclick="generateQR()">Generate QR</button>
-            <div id="qrCode"></div>
-        </div>
+
 
         <div class="card">
             <h2>Event Registration</h2>
             <input type="text" id="eventName" placeholder="Event Name">
             <input type="date" id="eventDate" placeholder="Date">
-            <input type="time" id="eventTime" placeholder="Time">
+            <div style="display:flex; gap:6px; margin:10px 0;">
+                <select id="eventHour" style="padding:8px; border-radius:5px; border:1px solid #ccc; flex:1;">
+                    <option value="">Hour</option>
+                    <option value="01">01</option>
+                    <option value="02">02</option>
+                    <option value="03">03</option>
+                    <option value="04">04</option>
+                    <option value="05">05</option>
+                    <option value="06">06</option>
+                    <option value="07">07</option>
+                    <option value="08">08</option>
+                    <option value="09">09</option>
+                    <option value="10">10</option>
+                    <option value="11">11</option>
+                    <option value="12">12</option>
+                </select>
+
+                <select id="eventAmPm" style="padding:8px; border-radius:5px; border:1px solid #ccc; flex:1;">
+                    <option value="">AM/PM</option>
+                    <option value="AM">AM</option>
+                    <option value="PM">PM</option>
+                </select>
+            </div>
             <input type="text" id="eventType" placeholder="Event Type (e.g., Seminar)">
             <textarea id="eventDesc" placeholder="Event Description" rows="3"
                 style="width: 90%; padding: 10px; margin: 10px 0; border-radius: 5px; border: 1px solid #ccc; font-family: inherit; resize: vertical;"></textarea>
@@ -100,6 +117,13 @@
             await signOut(auth);
             window.location.href = "index.html";
         }
+
+        // Set minimum selectable date to tomorrow and default value to tomorrow
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrowStr = tomorrow.toISOString().split("T")[0];
+        document.getElementById("eventDate").min = tomorrowStr;
+        document.getElementById("eventDate").value = tomorrowStr;
 
         // Load session history on page load
         loadSessionHistory();
@@ -185,12 +209,25 @@
         window.generateEventQR = async function () {
             const name = document.getElementById("eventName").value.trim();
             const date = document.getElementById("eventDate").value;
-            const time = document.getElementById("eventTime").value;
+            const hour12 = document.getElementById("eventHour").value;
+            const ampm = document.getElementById("eventAmPm").value;
             const type = document.getElementById("eventType").value.trim();
             const desc = document.getElementById("eventDesc").value.trim();
 
-            if (!name || !date || !time || !type || !desc) {
+            if (!name || !date || !hour12 || !ampm || !type || !desc) {
                 alert("Please fill all the fields.");
+                return;
+            }
+
+            // Convert 12-hour to 24-hour for validation and Firestore storage
+            let hour24 = parseInt(hour12, 10);
+            if (ampm === "AM" && hour24 === 12) hour24 = 0;
+            if (ampm === "PM" && hour24 !== 12) hour24 += 12;
+            const time = String(hour24).padStart(2, "0") + ":00";
+
+            const selectedDateTime = new Date(date + "T" + time);
+            if (selectedDateTime <= new Date()) {
+                alert("Event date and time must be in the future.");
                 return;
             }
 
@@ -220,9 +257,10 @@
         window.createSession = async function () {
 
             const radius = document.getElementById("radius").value;
-            const duration = document.getElementById("duration").value;
+            const durationMinutes = document.getElementById("duration").value;
+            const duration = durationMinutes * 60;
 
-            if (!radius || !duration) {
+            if (!radius || !durationMinutes) {
                 alert("Please enter radius and duration");
                 return;
             }
