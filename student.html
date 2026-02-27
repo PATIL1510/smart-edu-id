@@ -16,19 +16,11 @@
 
         <div class="card">
             <h2>Digital ID</h2>
-            <div style="display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
-                <div style="flex-shrink:0;">
-                    <img id="studentPhoto" src="" alt="Profile Photo"
-                        style="width:160px; height:160px; object-fit:cover; border-radius:8px; border:2px solid #4e73df; background:#eee;">
-                </div>
-                <div style="text-align:left;">
-                    <p>Name: <span id="studentName">--</span></p>
-                    <p>Email ID: <span id="studentEmail">--</span></p>
-                    <p>Address: <span id="studentAddress">--</span></p>
-                    <p>DOB: <span id="studentDOB">--</span></p>
-                    <p>Blood Group: <span id="studentBloodGroup">--</span></p>
-                </div>
-            </div>
+            <p>Name: <span id="studentName">--</span></p>
+            <p>Email ID: <span id="studentEmail">--</span></p>
+            <p>Address: <span id="studentAddress">--</span></p>
+            <p>DOB: <span id="studentDOB">--</span></p>
+            <p>Blood Group: <span id="studentBloodGroup">--</span></p>
         </div>
 
         <div class="card">
@@ -95,12 +87,11 @@
                     document.getElementById("studentAddress").innerText = data.address || "--";
                     document.getElementById("studentDOB").innerText = data.dob || "--";
                     document.getElementById("studentBloodGroup").innerText = data.bloodGroup || "--";
-                    if (data.photoURL) {
-                        document.getElementById("studentPhoto").src = data.photoURL;
-                    }
                 }
                 loadAttendanceHistory();
                 loadUpcomingEvents();
+                // Auto-check location to start attendance tracking if a session is active
+                checkLocation();
             }
         });
 
@@ -113,17 +104,10 @@
             activeSessionId = null;
             let latestTime = 0;
             const snapshot = await getDocs(collection(db, "sessions"));
-            const now = Date.now();
 
             snapshot.forEach((d) => {
                 const data = d.data();
                 if (data.isActive === true) {
-                    // Skip sessions whose endTime has already passed
-                    const endMs = data.endTime?.seconds
-                        ? data.endTime.seconds * 1000
-                        : new Date(data.endTime).getTime();
-                    if (endMs <= now) return;
-
                     const sessionTime = data.startTime.seconds || 0;
                     if (sessionTime >= latestTime) {
                         latestTime = sessionTime;
@@ -190,11 +174,7 @@
         }
 
         function startSessionTracking(duration) {
-            const now = new Date();
-            const sessionEnd = activeSession.endTime?.seconds
-                ? new Date(activeSession.endTime.seconds * 1000)
-                : new Date(activeSession.endTime);
-            let remaining = Math.max(0, Math.floor((sessionEnd - now) / 1000));
+            let remaining = duration;
             const timerElement = document.getElementById("studentTimer");
             timerElement.innerText = remaining + " sec";
 
