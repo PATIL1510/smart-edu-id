@@ -85,6 +85,19 @@
                         alert("Please fill all the fields.");
                         return;
                     }
+
+                    // Age validation: must be 15 or older
+                    const dobDate = new Date(dob);
+                    const today = new Date();
+                    let age = today.getFullYear() - dobDate.getFullYear();
+                    const monthDiff = today.getMonth() - dobDate.getMonth();
+                    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dobDate.getDate())) {
+                        age--;
+                    }
+                    if (age < 15) {
+                        alert("Registration allowed only for students aged 15 or above.");
+                        return;
+                    }
                 }
 
                 try {
