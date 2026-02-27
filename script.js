@@ -1,61 +1,35 @@
-import { auth, db } from "./firebase.js";
-import {
-    createUserWithEmailAndPassword,
-    signInWithEmailAndPassword
-} from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
-
-import {
-    doc,
-    setDoc
-} from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
-
-window.register = async function () {
-    const email = document.getElementById("email").value;
-    const password = document.getElementById("password").value;
+function login() {
     const role = document.getElementById("role").value;
 
-    try {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-
-        await setDoc(doc(db, "users", userCredential.user.uid), {
-            email: email,
-            role: role
-        });
-
-        alert("Registered successfully!");
-    } catch (error) {
-        alert(error.message);
+    if (role === "student") {
+        window.location.href = "student.html";
+    } else {
+        window.location.href = "teacher.html";
     }
-};
+}
 
-window.login = async function () {
-    const email = document.getElementById("email").value;
-    const password = document.getElementById("password").value;
+function register() {
+    alert("Register functionality will be connected with Firebase next.");
+}
 
-    try {
-        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+function logout() {
+    window.location.href = "index.html";
+}
 
-        const user = userCredential.user;
+function checkLocation() {
+    alert("Location logic will be implemented next.");
+}
 
-        // Get role from Firestore
-        const userDoc = await fetchUserRole(user.uid);
+function createSession() {
+    initMap(latitude, longitude, Number(radius));
+    listenToStudents(latitude, longitude, Number(radius));
+    alert("Session creation logic will be implemented next.");
+}
 
-        if (userDoc.role === "teacher") {
-            window.location.href = "teacher.html";
-        } else {
-            window.location.href = "student.html";
-        }
+function generateQR() {
+    alert("QR generation logic will be implemented next.");
+}
 
-    } catch (error) {
-        alert(error.message);
-    }
-};
-
-async function fetchUserRole(uid) {
-    const response = await fetch(`https://firestore.googleapis.com/v1/projects/${auth.app.options.projectId}/databases/(default)/documents/users/${uid}`);
-    const data = await response.json();
-
-    return {
-        role: data.fields.role.stringValue
-    };
+function scanQR() {
+    alert("QR scanning logic will be implemented next.");
 }
