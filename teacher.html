@@ -438,6 +438,16 @@
                         remainingSeconds: totalDuration,
                         timestamp: new Date()
                     });
+
+                    // Log timeline no_show
+                    await addDoc(collection(db, "studentTimeline"), {
+                        studentId: studentUID,
+                        eventId: currentSessionId,
+                        eventName: "Class Session",
+                        actionType: "no_show",
+                        timestamp: serverTimestamp(),
+                        metadata: {}
+                    });
                 }
             }
 

@@ -78,6 +78,13 @@
             </table>
         </div>
 
+        <div class="card">
+            <h2>Participation Timeline</h2>
+            <div id="studentTimelineContainer"
+                style="display:flex; flex-direction:column; gap:15px; margin-top:15px; text-align: left; padding-left: 10px; border-left: 2px solid #ccc;">
+            </div>
+        </div>
+
         <button class="logout" onclick="logout()">Logout</button>
     </div>
 
@@ -111,6 +118,7 @@
                 }
                 loadAttendanceHistory();
                 loadUpcomingEvents();
+                loadTimeline();
             }
         });
 
@@ -290,8 +298,19 @@
                 }
             );
 
+            // Log timeline event
+            await addDoc(collection(db, "studentTimeline"), {
+                studentId: auth.currentUser.uid,
+                eventId: activeSessionId,
+                eventName: "Class Session",
+                actionType: (cappedInsideTimer >= totalDuration * 0.8) ? "attended" : "late",
+                timestamp: serverTimestamp(),
+                metadata: { duration: cappedInsideTimer }
+            });
+
             alert("Attendance Marked Successfully ✅");
             loadAttendanceHistory();
+            loadTimeline();
         }
 
         // Load attendance history for current student
@@ -454,6 +473,15 @@
                     return;
                 }
 
+                // Fetch eventName
+                let eventName = "Event Registration";
+                try {
+                    const eventDoc = await getDoc(doc(db, "events", eventId));
+                    if (eventDoc.exists()) {
+                        eventName = eventDoc.data().eventName || eventDoc.data().name || eventName;
+                    }
+                } catch (e) { console.error("Could not fetch event name", e); }
+
                 // Register
                 await addDoc(collection(db, "eventRegistrations"), {
                     eventId: eventId,
@@ -461,7 +489,18 @@
                     registeredAt: serverTimestamp()
                 });
 
+                // Log timeline event
+                await addDoc(collection(db, "studentTimeline"), {
+                    studentId: studentId,
+                    eventId: eventId,
+                    eventName: eventName,
+                    actionType: "registered",
+                    timestamp: serverTimestamp(),
+                    metadata: {}
+                });
+
                 alert("Registration Successful");
+                loadTimeline();
             } catch (e) {
                 alert("Error registering: " + e.message);
             }
@@ -479,6 +518,71 @@
 
         function onScanError(errorMessage) {
             // Background scan error, ignore
+        }
+
+        async function loadTimeline() {
+            const user = auth.currentUser;
+            if (!user) return;
+            try {
+                const q = query(collection(db, "studentTimeline"), where("studentId", "==", user.uid));
+                const snap = await getDocs(q);
+                let timelineData = [];
+                snap.forEach(doc => {
+                    timelineData.push(doc.data());
+                });
+
+                // Sort by timestamp desc locally to avoid requiring complex composite index on standard fields immediately
+                timelineData.sort((a, b) => {
+                    // Handle case where serverTimestamp hasn't synced yet locally
+                    const timeA = a.timestamp?.seconds ? a.timestamp.seconds * 1000 : Date.now();
+                    const timeB = b.timestamp?.seconds ? b.timestamp.seconds * 1000 : Date.now();
+                    return timeB - timeA;
+                });
+
+                const container = document.getElementById("studentTimelineContainer");
+                container.innerHTML = "";
+
+                if (timelineData.length === 0) {
+                    container.innerHTML = "<p>No participation activity yet.</p>";
+                    return;
+                }
+
+                const visualStyles = {
+                    registered: { color: "#4e73df", icon: "📝", label: "Registered" },
+                    attended: { color: "#1cc88a", icon: "✅", label: "Attended" },
+                    late: { color: "#f6c23e", icon: "⏰", label: "Late" },
+                    no_show: { color: "#e74a3b", icon: "❌", label: "No Show" },
+                    certificate_earned: { color: "#f6c23e", icon: "🏆", label: "Certificate Earned" },
+                    volunteer: { color: "#6f42c1", icon: "🎤", label: "Volunteer" }
+                };
+
+                timelineData.forEach(item => {
+                    const style = visualStyles[item.actionType] || { color: "#858796", icon: "ℹ️", label: item.actionType };
+                    const dateStr = item.timestamp?.seconds
+                        ? new Date(item.timestamp.seconds * 1000).toLocaleString()
+                        : new Date().toLocaleString() + " (Syncing)";
+
+                    const div = document.createElement("div");
+                    div.style.position = "relative";
+                    div.style.paddingBottom = "15px";
+
+                    div.innerHTML = `
+                        <div style="position: absolute; left: -19px; top: 0; width: 14px; height: 14px; border-radius: 50%; background: ${style.color}; border: 2px solid white;"></div>
+                        <div style="font-weight: bold; font-size: 16px;">
+                            ${item.eventName || "Unknown Event"} 
+                            <span style="font-size:14px; color:${style.color}; margin-left:10px;">
+                                ${style.icon} ${style.label}
+                            </span>
+                        </div>
+                        <div style="font-size: 13px; color: #666; margin-top: 3px;">
+                            ${dateStr}
+                        </div>
+                    `;
+                    container.appendChild(div);
+                });
+            } catch (error) {
+                console.error("Error loading timeline:", error);
+            }
         }
 
         window.handleQRImageUpload = async function (event) {
