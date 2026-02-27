@@ -363,11 +363,8 @@
                     // Show session completed badge
                     document.getElementById("sessionBadge").style.display = "block";
 
-                    // Wait 5 seconds before marking absentees so students have
-                    // time to write their own 'present' record first
-                    setTimeout(() => {
-                        markAbsentees();
-                    }, 5000);
+                    // Auto mark absentees then load report
+                    markAbsentees();
                     return;
                 }
 
@@ -411,20 +408,13 @@
             loadSessionHistory();
         }
 
-        // PHASE 2: Load attendance report table (real-time via onSnapshot)
-        let attendanceUnsubscribers = [];
-
+        // PHASE 2: Load attendance report table
         async function loadAttendanceReport() {
             if (!currentSessionId) return;
-
-            // Stop any previous listeners
-            attendanceUnsubscribers.forEach(unsub => unsub());
-            attendanceUnsubscribers = [];
 
             const tbody = document.getElementById("attendanceBody");
             tbody.innerHTML = "";
             attendanceReportData = [];
-            document.getElementById("attendanceReportSection").style.display = "block";
 
             const usersSnap = await getDocs(query(collection(db, "users"), where("role", "==", "student")));
 
@@ -432,47 +422,30 @@
                 const studentUID = userDoc.id;
                 const studentEmail = userDoc.data().email;
 
-                // Create a placeholder row for this student
-                const row = document.createElement("tr");
-                row.id = "att-row-" + studentUID;
-                row.innerHTML =
-                    "<td>" + studentEmail + "</td>" +
-                    "<td>--</td><td>--</td><td>--</td>";
-                tbody.appendChild(row);
-
-                // Listen in real-time to this student's attendance doc
                 const attendanceRef = doc(db, "attendance", studentUID, "sessions", currentSessionId);
-                const unsub = onSnapshot(attendanceRef, (attSnap) => {
-                    const existingRow = document.getElementById("att-row-" + studentUID);
-                    if (!existingRow) return;
+                const attendanceSnap = await getDoc(attendanceRef);
 
-                    if (attSnap.exists()) {
-                        const data = attSnap.data();
-                        const rowData = {
-                            email: studentEmail,
-                            status: data.status,
-                            attendedSeconds: data.attendedSeconds || 0,
-                            remainingSeconds: data.remainingSeconds || 0
-                        };
+                if (attendanceSnap.exists()) {
+                    const data = attendanceSnap.data();
+                    const rowData = {
+                        email: studentEmail,
+                        status: data.status,
+                        attendedSeconds: data.attendedSeconds || 0,
+                        remainingSeconds: data.remainingSeconds || 0
+                    };
+                    attendanceReportData.push(rowData);
 
-                        // Update global report data
-                        const idx = attendanceReportData.findIndex(r => r.email === studentEmail);
-                        if (idx >= 0) {
-                            attendanceReportData[idx] = rowData;
-                        } else {
-                            attendanceReportData.push(rowData);
-                        }
-
-                        existingRow.innerHTML =
-                            "<td>" + studentEmail + "</td>" +
-                            "<td>" + (data.status === "present" ? "Present ✅" : "Absent ❌") + "</td>" +
-                            "<td>" + rowData.attendedSeconds + "</td>" +
-                            "<td>" + rowData.remainingSeconds + "</td>";
-                    }
-                });
-
-                attendanceUnsubscribers.push(unsub);
+                    const row = document.createElement("tr");
+                    row.innerHTML =
+                        "<td>" + studentEmail + "</td>" +
+                        "<td>" + (data.status === "present" ? "Present ✅" : "Absent ❌") + "</td>" +
+                        "<td>" + rowData.attendedSeconds + "</td>" +
+                        "<td>" + rowData.remainingSeconds + "</td>";
+                    tbody.appendChild(row);
+                }
             }
+
+            document.getElementById("attendanceReportSection").style.display = "block";
         }
 
         // PHASE 3: Session History
