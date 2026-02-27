@@ -1,0 +1,32 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users: authenticated users can read any user, but only write their own
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Sessions: any authenticated user can read, only authenticated users can create
+    match /sessions/{sessionId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+    }
+
+    // Attendance: students write their own, teachers can write absent entries
+    match /attendance/{studentUID}/sessions/{sessionId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && (request.auth.uid == studentUID || request.resource.data.status == "absent");
+    }
+
+    // Student Locations: students can only write their own location
+    match /studentLocations/{studentUID} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == studentUID;
+    }
+  }
+}
