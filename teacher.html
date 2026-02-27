@@ -2,8 +2,12 @@
 <html>
 
 <head>
+    <meta charset="UTF-8">
     <title>Teacher Dashboard</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 
 <body>
@@ -25,10 +29,523 @@
             <div id="qrCode"></div>
         </div>
 
+        <div class="card">
+            <h2>Event Registration</h2>
+            <input type="text" id="eventName" placeholder="Event Name">
+            <input type="date" id="eventDate" placeholder="Date">
+            <input type="time" id="eventTime" placeholder="Time">
+            <input type="text" id="eventType" placeholder="Event Type (e.g., Seminar)">
+            <textarea id="eventDesc" placeholder="Event Description" rows="3"
+                style="width: 90%; padding: 10px; margin: 10px 0; border-radius: 5px; border: 1px solid #ccc; font-family: inherit; resize: vertical;"></textarea>
+            <button onclick="generateEventQR()">Generate QR</button>
+            <div id="eventQRCode" style="margin-top: 15px; display: flex; justify-content: center;"></div>
+        </div>
+
+        <div id="registeredStudentsContainer">
+            <!-- Dynamic Event Sections -->
+        </div>
+        <div id="map" style="height: 400px; width: 100%;"></div>
+        <h3>Students Inside Radius: <span id="studentCount">0</span></h3>
+        <h3>Session Timer: <span id="sessionTimer">--</span></h3>
+        <p id="sessionBadge" style="display: none;" class="badge">Session Completed ✅</p>
+
+        <div id="attendanceReportSection" class="card" style="display: none;">
+            <h2>Session Attendance Report</h2>
+            <button onclick="downloadCSV()">Download Attendance Report (CSV)</button>
+            <table id="attendanceTable">
+                <thead>
+                    <tr>
+                        <th>Student Email</th>
+                        <th>Status</th>
+                        <th>Attended (s)</th>
+                        <th>Remaining (s)</th>
+                    </tr>
+                </thead>
+                <tbody id="attendanceBody"></tbody>
+            </table>
+        </div>
+
+        <div class="card">
+            <h2>Session History</h2>
+            <table id="sessionHistoryTable">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Duration (s)</th>
+                        <th>Present</th>
+                        <th>Absent</th>
+                    </tr>
+                </thead>
+                <tbody id="sessionHistoryBody"></tbody>
+            </table>
+        </div>
+
         <button class="logout" onclick="logout()">Logout</button>
     </div>
 
-    <script type="module" src="script.js"></script>
+
+    <script type="module">
+
+        import { auth, db } from "./firebase.js";
+        import { collection, addDoc, onSnapshot, doc, setDoc, getDoc, getDocs, query, where, serverTimestamp }
+            from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+        import { signOut, onAuthStateChanged }
+            from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
+
+        let currentSessionId = null;
+        let currentSessionData = null;
+        let attendanceReportData = [];
+
+        window.logout = async function () {
+            await signOut(auth);
+            window.location.href = "index.html";
+        }
+
+        // Load session history on page load
+        loadSessionHistory();
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                loadTeacherEventsAndRegistrations(user.uid);
+            }
+        });
+
+        function loadTeacherEventsAndRegistrations(teacherUid) {
+            const eventsQuery = query(collection(db, "events"), where("createdBy", "==", teacherUid));
+
+            onSnapshot(eventsQuery, (eventsSnapshot) => {
+                const container = document.getElementById("registeredStudentsContainer");
+                container.innerHTML = ""; // Clear container
+
+                const events = [];
+                eventsSnapshot.forEach((d) => {
+                    events.push({ id: d.id, ...d.data() });
+                });
+                events.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+
+                events.forEach((event) => {
+                    const eventId = event.id;
+
+                    const section = document.createElement("div");
+                    section.className = "card";
+                    section.innerHTML = `
+                        <h2>Registered Students for ${event.eventName}</h2>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Address</th>
+                                    <th>DOB</th>
+                                    <th>Blood Group</th>
+                                </tr>
+                            </thead>
+                            <tbody id="registrations-${eventId}">
+                                <tr><td colspan="5">Loading records...</td></tr>
+                            </tbody>
+                        </table>
+                    `;
+                    container.appendChild(section);
+
+                    const regsQuery = query(collection(db, "eventRegistrations"), where("eventId", "==", eventId));
+                    onSnapshot(regsQuery, async (regsSnapshot) => {
+                        const tbody = document.getElementById(`registrations-${eventId}`);
+                        tbody.innerHTML = "";
+
+                        if (regsSnapshot.empty) {
+                            tbody.innerHTML = '<tr><td colspan="5">No students registered yet.</td></tr>';
+                            return;
+                        }
+
+                        for (const regDoc of regsSnapshot.docs) {
+                            const studentId = regDoc.data().studentId;
+                            try {
+                                const userSnap = await getDoc(doc(db, "users", studentId));
+                                if (userSnap.exists()) {
+                                    const studentData = userSnap.data();
+                                    const row = document.createElement("tr");
+                                    row.innerHTML = `
+                                        <td>${studentData.name || '--'}</td>
+                                        <td>${studentData.email || '--'}</td>
+                                        <td>${studentData.address || '--'}</td>
+                                        <td>${studentData.dob || '--'}</td>
+                                        <td>${studentData.bloodGroup || '--'}</td>
+                                    `;
+                                    tbody.appendChild(row);
+                                }
+                            } catch (e) {
+                                console.error("Error fetching student details:", e);
+                            }
+                        }
+                    });
+                });
+            });
+        }
+
+        window.generateEventQR = async function () {
+            const name = document.getElementById("eventName").value.trim();
+            const date = document.getElementById("eventDate").value;
+            const time = document.getElementById("eventTime").value;
+            const type = document.getElementById("eventType").value.trim();
+            const desc = document.getElementById("eventDesc").value.trim();
+
+            if (!name || !date || !time || !type || !desc) {
+                alert("Please fill all the fields.");
+                return;
+            }
+
+            try {
+                const eventRef = await addDoc(collection(db, "events"), {
+                    eventName: name,
+                    date: date,
+                    time: time,
+                    type: type,
+                    description: desc,
+                    createdBy: auth.currentUser.uid,
+                    createdAt: serverTimestamp()
+                });
+
+                document.getElementById("eventQRCode").innerHTML = "";
+                new QRCode(document.getElementById("eventQRCode"), {
+                    text: eventRef.id,
+                    width: 150,
+                    height: 150
+                });
+
+            } catch (error) {
+                alert(error.message);
+            }
+        }
+
+        window.createSession = async function () {
+
+            const radius = document.getElementById("radius").value;
+            const duration = document.getElementById("duration").value;
+
+            if (!radius || !duration) {
+                alert("Please enter radius and duration");
+                return;
+            }
+
+            // Reset UI for new session
+            document.getElementById("sessionBadge").style.display = "none";
+            document.getElementById("attendanceReportSection").style.display = "none";
+            document.getElementById("attendanceBody").innerHTML = "";
+            attendanceReportData = [];
+
+            navigator.geolocation.getCurrentPosition(
+                async function (position) {
+
+                    const latitude = position.coords.latitude;
+                    const longitude = position.coords.longitude;
+
+                    try {
+
+                        const startTime = new Date();
+                        const endTime = new Date(startTime.getTime() + duration * 1000);
+
+                        const docRef = await addDoc(collection(db, "sessions"), {
+                            teacherId: auth.currentUser.uid,
+                            latitude: latitude,
+                            longitude: longitude,
+                            radius: Number(radius),
+                            duration: Number(duration),
+                            startTime: startTime,
+                            endTime: endTime,
+                            isActive: true
+                        });
+
+                        currentSessionId = docRef.id;
+                        currentSessionData = {
+                            duration: Number(duration),
+                            teacherId: auth.currentUser.uid
+                        };
+
+                        alert("Session Created Successfully!");
+                        initMap(latitude, longitude, Number(radius));
+                        listenToStudents(latitude, longitude, Number(radius));
+                        startSessionCountdown(endTime);
+
+                    } catch (error) {
+                        alert(error.message);
+                    }
+                },
+                function (error) {
+                    alert("Location permission denied");
+                }
+            );
+        }
+        let map;
+        let circle;
+        let teacherMarker;
+
+        function initMap(latitude, longitude, radius) {
+
+            if (map) {
+                map.remove();
+            }
+
+            map = L.map('map').setView([latitude, longitude], 17);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+
+            teacherMarker = L.marker([latitude, longitude]).addTo(map)
+                .bindPopup("Teacher Location")
+                .openPopup();
+
+            circle = L.circle([latitude, longitude], {
+                color: 'red',
+                fillColor: '#f03',
+                fillOpacity: 0.3,
+                radius: radius
+            }).addTo(map);
+        }
+
+
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+
+            const a =
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) *
+                Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) *
+                Math.sin(dLon / 2);
+
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c * 1000;
+        }
+
+        function listenToStudents(teacherLat, teacherLon, radius) {
+
+            onSnapshot(collection(db, "studentLocations"), (snapshot) => {
+
+                let count = 0;
+
+                snapshot.forEach((doc) => {
+
+                    const data = doc.data();
+
+                    const distance = calculateDistance(
+                        teacherLat,
+                        teacherLon,
+                        data.latitude,
+                        data.longitude
+                    );
+
+                    if (distance <= radius) {
+                        count++;
+                    }
+                });
+
+                document.getElementById("studentCount").innerText = count;
+            });
+        }
+
+        function startSessionCountdown(endTime) {
+
+            const timerElement = document.getElementById("sessionTimer");
+
+            const interval = setInterval(() => {
+
+                const now = new Date();
+                const end = endTime.seconds ? new Date(endTime.seconds * 1000) : new Date(endTime);
+                const remaining = end - now;
+
+                if (remaining <= 0) {
+                    timerElement.innerText = "Session Ended";
+                    clearInterval(interval);
+
+                    // Show session completed badge
+                    document.getElementById("sessionBadge").style.display = "block";
+
+                    // Wait 5 seconds before marking absentees so students have
+                    // time to write their own 'present' record first
+                    setTimeout(() => {
+                        markAbsentees();
+                    }, 5000);
+                    return;
+                }
+
+                const seconds = Math.floor(remaining / 1000);
+                timerElement.innerText = seconds + " sec";
+
+            }, 1000);
+        }
+
+        // PHASE 1: Auto mark absentees
+        async function markAbsentees() {
+            if (!currentSessionId || !currentSessionData) return;
+
+            const totalDuration = currentSessionData.duration;
+
+            // Get all students
+            const usersSnap = await getDocs(query(collection(db, "users"), where("role", "==", "student")));
+
+            for (const userDoc of usersSnap.docs) {
+                const studentUID = userDoc.id;
+
+                // Check if attendance already exists for this session
+                const attendanceRef = doc(db, "attendance", studentUID, "sessions", currentSessionId);
+                const attendanceSnap = await getDoc(attendanceRef);
+
+                if (!attendanceSnap.exists()) {
+                    // Mark as absent
+                    await setDoc(attendanceRef, {
+                        sessionId: currentSessionId,
+                        status: "absent",
+                        attendedSeconds: 0,
+                        totalDuration: totalDuration,
+                        remainingSeconds: totalDuration,
+                        timestamp: new Date()
+                    });
+                }
+            }
+
+            // Load attendance report after marking absentees
+            loadAttendanceReport();
+            loadSessionHistory();
+        }
+
+        // PHASE 2: Load attendance report table (real-time via onSnapshot)
+        let attendanceUnsubscribers = [];
+
+        async function loadAttendanceReport() {
+            if (!currentSessionId) return;
+
+            // Stop any previous listeners
+            attendanceUnsubscribers.forEach(unsub => unsub());
+            attendanceUnsubscribers = [];
+
+            const tbody = document.getElementById("attendanceBody");
+            tbody.innerHTML = "";
+            attendanceReportData = [];
+            document.getElementById("attendanceReportSection").style.display = "block";
+
+            const usersSnap = await getDocs(query(collection(db, "users"), where("role", "==", "student")));
+
+            for (const userDoc of usersSnap.docs) {
+                const studentUID = userDoc.id;
+                const studentEmail = userDoc.data().email;
+
+                // Create a placeholder row for this student
+                const row = document.createElement("tr");
+                row.id = "att-row-" + studentUID;
+                row.innerHTML =
+                    "<td>" + studentEmail + "</td>" +
+                    "<td>--</td><td>--</td><td>--</td>";
+                tbody.appendChild(row);
+
+                // Listen in real-time to this student's attendance doc
+                const attendanceRef = doc(db, "attendance", studentUID, "sessions", currentSessionId);
+                const unsub = onSnapshot(attendanceRef, (attSnap) => {
+                    const existingRow = document.getElementById("att-row-" + studentUID);
+                    if (!existingRow) return;
+
+                    if (attSnap.exists()) {
+                        const data = attSnap.data();
+                        const rowData = {
+                            email: studentEmail,
+                            status: data.status,
+                            attendedSeconds: data.attendedSeconds || 0,
+                            remainingSeconds: data.remainingSeconds || 0
+                        };
+
+                        // Update global report data
+                        const idx = attendanceReportData.findIndex(r => r.email === studentEmail);
+                        if (idx >= 0) {
+                            attendanceReportData[idx] = rowData;
+                        } else {
+                            attendanceReportData.push(rowData);
+                        }
+
+                        existingRow.innerHTML =
+                            "<td>" + studentEmail + "</td>" +
+                            "<td>" + (data.status === "present" ? "Present ✅" : "Absent ❌") + "</td>" +
+                            "<td>" + rowData.attendedSeconds + "</td>" +
+                            "<td>" + rowData.remainingSeconds + "</td>";
+                    }
+                });
+
+                attendanceUnsubscribers.push(unsub);
+            }
+        }
+
+        // PHASE 3: Session History
+        async function loadSessionHistory() {
+            const tbody = document.getElementById("sessionHistoryBody");
+            tbody.innerHTML = "";
+
+            const sessionsSnap = await getDocs(collection(db, "sessions"));
+            const sessions = [];
+
+            sessionsSnap.forEach((d) => {
+                sessions.push({ id: d.id, ...d.data() });
+            });
+
+            // Sort by startTime descending
+            sessions.sort((a, b) => (b.startTime?.seconds || 0) - (a.startTime?.seconds || 0));
+
+            for (const session of sessions) {
+                const date = session.startTime?.seconds
+                    ? new Date(session.startTime.seconds * 1000).toLocaleDateString()
+                    : "--";
+
+                // Count present/absent for this session
+                let presentCount = 0;
+                let absentCount = 0;
+
+                const usersSnap = await getDocs(query(collection(db, "users"), where("role", "==", "student")));
+
+                for (const userDoc of usersSnap.docs) {
+                    const attRef = doc(db, "attendance", userDoc.id, "sessions", session.id);
+                    const attSnap = await getDoc(attRef);
+                    if (attSnap.exists()) {
+                        if (attSnap.data().status === "present") {
+                            presentCount++;
+                        } else {
+                            absentCount++;
+                        }
+                    }
+                }
+
+                const row = document.createElement("tr");
+                row.innerHTML =
+                    "<td>" + date + "</td>" +
+                    "<td>" + (session.duration || 0) + "</td>" +
+                    "<td>" + presentCount + "</td>" +
+                    "<td>" + absentCount + "</td>";
+                tbody.appendChild(row);
+            }
+        }
+
+        // PHASE 5: CSV Export
+        window.downloadCSV = function () {
+            if (attendanceReportData.length === 0) {
+                alert("No attendance data to download.");
+                return;
+            }
+
+            let csv = "Student Email,Status,Attended Seconds,Remaining Seconds\n";
+
+            attendanceReportData.forEach((row) => {
+                csv += row.email + "," + row.status + "," + row.attendedSeconds + "," + row.remainingSeconds + "\n";
+            });
+
+            const blob = new Blob([csv], { type: "text/csv" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "attendance_report.csv";
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+    </script>
 </body>
 
 </html>
