@@ -43,16 +43,19 @@
                     <option value="O+">O+</option>
                     <option value="O-">O-</option>
                 </select>
+                <input type="file" id="profileImage" accept="image/*">
             </div>
         </div>
 
         <script type="module">
 
-            import { auth, db } from "./firebase.js";
+            import { auth, db, storage } from "./firebase.js";
             import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut }
                 from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
             import { doc, setDoc, getDoc }
                 from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+            import { ref, uploadBytes, getDownloadURL }
+                from "https://www.gstatic.com/firebasejs/12.9.0/firebase-storage.js";
 
             window.register = async function () {
 
@@ -80,9 +83,10 @@
                     const address = document.getElementById("address").value;
                     const dob = document.getElementById("dob").value;
                     const bloodGroup = document.getElementById("bloodGroup").value;
+                    const imageFile = document.getElementById("profileImage").files[0];
 
-                    if (!name || !address || !dob || !bloodGroup) {
-                        alert("Please fill all the fields.");
+                    if (!name || !address || !dob || !bloodGroup || !imageFile) {
+                        alert("Please fill all the fields and select a profile image.");
                         return;
                     }
 
@@ -113,6 +117,17 @@
                         userData.address = document.getElementById("address").value;
                         userData.dob = document.getElementById("dob").value;
                         userData.bloodGroup = document.getElementById("bloodGroup").value;
+                        const imageFile = document.getElementById("profileImage").files[0];
+                        if (imageFile) {
+                            try {
+                                const storageRef = ref(storage, `studentImages/${userCredential.user.uid}.jpg`);
+                                await uploadBytes(storageRef, imageFile);
+                                userData.photoURL = await getDownloadURL(storageRef);
+                            } catch (uploadError) {
+                                console.error("Error uploading profile image:", uploadError);
+                                alert("Account created, but profile image upload failed. " + uploadError.message);
+                            }
+                        }
                     }
 
                     await setDoc(doc(db, "users", userCredential.user.uid), userData);
