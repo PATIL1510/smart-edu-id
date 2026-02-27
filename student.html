@@ -2,8 +2,11 @@
 <html>
 
 <head>
+    <meta charset="UTF-8">
     <title>Student Dashboard</title>
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
 </head>
 
 <body>
@@ -13,14 +16,18 @@
 
         <div class="card">
             <h2>Digital ID</h2>
-            <p>Name: <span id="studentName">Student Name</span></p>
-            <p>Email: <span id="studentEmail">student@email.com</span></p>
+            <p>Name: <span id="studentName">--</span></p>
+            <p>Email ID: <span id="studentEmail">--</span></p>
+            <p>Address: <span id="studentAddress">--</span></p>
+            <p>DOB: <span id="studentDOB">--</span></p>
+            <p>Blood Group: <span id="studentBloodGroup">--</span></p>
         </div>
 
         <div class="card">
             <h2>Attendance</h2>
             <button onclick="checkLocation()">Check Classroom Presence</button>
             <p id="attendanceStatus">Status: Not Checked</p>
+            <h3>Session Time Remaining: <span id="studentTimer">--</span></h3>
         </div>
 
         <div class="card">
@@ -28,10 +35,425 @@
             <button onclick="scanQR()">Scan Activity QR</button>
         </div>
 
+        <div class="card" id="upcomingEventsCard" style="display:none;">
+            <h2>Upcoming Events</h2>
+            <div id="upcomingEventsContainer" style="display:flex; flex-direction:column; gap:10px;">
+                <!-- Event cards go here -->
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Event Registration Scan</h2>
+            <button onclick="startEventQRScanner()" id="startEventScanBtn">Scan Event QR</button>
+            <button onclick="closeEventQRScanner()" id="closeEventScanBtn"
+                style="display:none; background: #e74a3b;">Close Scanner</button>
+            <div id="eventQrReader" style="width: 100%; max-width: 400px; margin: 15px auto;"></div>
+        </div>
+
+        <div class="card">
+            <h2>My Attendance History</h2>
+            <table id="attendanceHistoryTable">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Status</th>
+                        <th>Attended (s)</th>
+                        <th>Total (s)</th>
+                    </tr>
+                </thead>
+                <tbody id="attendanceHistoryBody"></tbody>
+            </table>
+        </div>
+
         <button class="logout" onclick="logout()">Logout</button>
     </div>
 
-    <script type="module" src="script.js"></script>
+    <script type="module">
+
+        import { auth, db } from "./firebase.js";
+        import { doc, setDoc, getDoc, getDocs, collection, query, where, onSnapshot, serverTimestamp, addDoc }
+            from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+        import { onAuthStateChanged, signOut }
+            from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
+
+        window.logout = async function () {
+            await signOut(auth);
+            window.location.href = "index.html";
+        }
+
+        // Fetch and display student data on load
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                const docSnap = await getDoc(doc(db, "users", user.uid));
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    document.getElementById("studentName").innerText = data.name || "--";
+                    document.getElementById("studentEmail").innerText = data.email || "--";
+                    document.getElementById("studentAddress").innerText = data.address || "--";
+                    document.getElementById("studentDOB").innerText = data.dob || "--";
+                    document.getElementById("studentBloodGroup").innerText = data.bloodGroup || "--";
+                }
+                loadAttendanceHistory();
+                loadUpcomingEvents();
+                // Auto-check location to start attendance tracking if a session is active
+                checkLocation();
+            }
+        });
+
+        let activeSession = null;
+        let activeSessionId = null;
+
+        // Get active session (most recent one)
+        async function getActiveSession() {
+            activeSession = null;
+            activeSessionId = null;
+            let latestTime = 0;
+            const snapshot = await getDocs(collection(db, "sessions"));
+
+            snapshot.forEach((d) => {
+                const data = d.data();
+                if (data.isActive === true) {
+                    const sessionTime = data.startTime.seconds || 0;
+                    if (sessionTime >= latestTime) {
+                        latestTime = sessionTime;
+                        activeSession = data;
+                        activeSessionId = d.id;
+                    }
+                }
+            });
+        }
+
+
+        function getDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371000;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+        let countdownInterval = null;
+        let insideTimer = 0;
+        let attendanceMarked = false;
+
+        window.checkLocation = async function () {
+            if (attendanceMarked) {
+                alert("Attendance already marked for this session!");
+                return;
+            }
+
+            await getActiveSession();
+
+            if (!activeSession) {
+                document.getElementById("attendanceStatus").innerText = "Status: No active session found";
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                function (position) {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+
+                    const distance = getDistance(
+                        lat, lon,
+                        activeSession.latitude, activeSession.longitude
+                    );
+
+                    if (distance <= activeSession.radius) {
+                        document.getElementById("attendanceStatus").innerText = "Status: Present ✅ — Tracking started";
+
+                        // Only start tracking if not already running
+                        if (!countdownInterval) {
+                            startSessionTracking(activeSession.duration);
+                        }
+                    } else {
+                        document.getElementById("attendanceStatus").innerText = "Status: Outside classroom ❌";
+                    }
+                },
+                function () {
+                    document.getElementById("attendanceStatus").innerText = "Status: Location permission denied";
+                }
+            );
+        }
+
+        function startSessionTracking(duration) {
+            let remaining = duration;
+            const timerElement = document.getElementById("studentTimer");
+            timerElement.innerText = remaining + " sec";
+
+            countdownInterval = setInterval(() => {
+
+                // Check if session has ended
+                const now = new Date();
+                const sessionEnd = activeSession.endTime.seconds
+                    ? new Date(activeSession.endTime.seconds * 1000)
+                    : new Date(activeSession.endTime);
+
+                if (now >= sessionEnd) {
+                    clearInterval(countdownInterval);
+                    countdownInterval = null;
+                    timerElement.innerText = "Session Ended";
+
+                    // --- POST-SESSION ATTENDANCE DECISION ---
+                    const totalDuration = duration;
+                    const attendedTime = insideTimer;
+                    const remainingTime = totalDuration - attendedTime;
+                    const twentyPercent = totalDuration * 0.2;
+
+                    if (attendedTime >= totalDuration) {
+                        // CASE 1: Full attendance
+                        markAttendance(totalDuration);
+                    } else if (remainingTime <= twentyPercent) {
+                        // CASE 2: Missed <= 20%
+                        markAttendance(totalDuration);
+                    } else {
+                        // Not enough attendance
+                        document.getElementById("attendanceStatus").innerText =
+                            "Status: Attendance not marked — attended " + attendedTime + "s / " + totalDuration + "s ❌";
+                    }
+                    return;
+                }
+
+                remaining--;
+                timerElement.innerText = remaining + " sec";
+
+                // Track location each second
+                navigator.geolocation.getCurrentPosition(
+                    function (position) {
+                        const lat = position.coords.latitude;
+                        const lon = position.coords.longitude;
+
+                        const distance = getDistance(
+                            lat, lon,
+                            activeSession.latitude, activeSession.longitude
+                        );
+
+                        if (distance <= activeSession.radius) {
+                            if (insideTimer < duration) {
+                                insideTimer++;
+                            }
+                            document.getElementById("attendanceStatus").innerText = "Status: Present ✅";
+                        } else {
+                            // Pause — do NOT reset insideTimer
+                            document.getElementById("attendanceStatus").innerText = "Status: Outside classroom (paused) ⏸️";
+                        }
+                    },
+                    function () {
+                        document.getElementById("attendanceStatus").innerText = "Status: Location unavailable (paused) ⏸️";
+                    }
+                );
+
+            }, 1000);
+        }
+
+        async function markAttendance(totalDuration) {
+            attendanceMarked = true;
+            const cappedInsideTimer = Math.min(insideTimer, totalDuration);
+            const remainingSeconds = Math.max(0, totalDuration - cappedInsideTimer);
+
+            document.getElementById("studentTimer").innerText = "Completed!";
+            document.getElementById("attendanceStatus").innerText =
+                "Status: Attendance Marked ✅ (" + cappedInsideTimer + "s / " + totalDuration + "s)";
+
+            await setDoc(
+                doc(db, "attendance", auth.currentUser.uid, "sessions", activeSessionId),
+                {
+                    sessionId: activeSessionId,
+                    status: "present",
+                    attendedSeconds: cappedInsideTimer,
+                    totalDuration: totalDuration,
+                    remainingSeconds: remainingSeconds,
+                    timestamp: new Date()
+                }
+            );
+
+            alert("Attendance Marked Successfully ✅");
+            loadAttendanceHistory();
+        }
+
+        // Load attendance history for current student
+        async function loadAttendanceHistory() {
+            const user = auth.currentUser;
+            if (!user) return;
+
+            const tbody = document.getElementById("attendanceHistoryBody");
+            tbody.innerHTML = "";
+
+            const historySnap = await getDocs(collection(db, "attendance", user.uid, "sessions"));
+
+            if (historySnap.empty) {
+                tbody.innerHTML = '<tr><td colspan="4">No attendance records yet.</td></tr>';
+                return;
+            }
+
+            const rows = [];
+            historySnap.forEach((d) => {
+                const data = d.data();
+                const date = data.timestamp?.seconds
+                    ? new Date(data.timestamp.seconds * 1000).toLocaleDateString()
+                    : "--";
+                rows.push({ date, ...data });
+            });
+
+            rows.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+
+            rows.forEach((data) => {
+                const row = document.createElement("tr");
+                row.innerHTML =
+                    "<td>" + data.date + "</td>" +
+                    "<td>" + (data.status === "present" ? "Present  ✅" : "Absent ❌") + "</td>" +
+                    "<td>" + (data.attendedSeconds || 0) + "</td>" +
+                    "<td>" + (data.totalDuration || 0) + "</td>";
+                tbody.appendChild(row);
+            });
+        }
+
+        function loadUpcomingEvents() {
+            const eventsQuery = query(collection(db, "events"));
+
+            onSnapshot(eventsQuery, (eventsSnapshot) => {
+                const container = document.getElementById("upcomingEventsContainer");
+                container.innerHTML = "";
+
+                if (eventsSnapshot.empty) {
+                    document.getElementById("upcomingEventsCard").style.display = "none";
+                    return;
+                }
+
+                document.getElementById("upcomingEventsCard").style.display = "block";
+
+                const events = [];
+                eventsSnapshot.forEach((d) => {
+                    events.push({ id: d.id, ...d.data() });
+                });
+                events.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+
+                events.forEach(event => {
+                    const eventId = event.id;
+                    const isOpened = localStorage.getItem(`event_opened_${eventId}`) === "true";
+
+                    const card = document.createElement("div");
+                    card.className = "event-card";
+                    card.style.border = "1px solid #ddd";
+                    card.style.padding = "10px";
+                    card.style.borderRadius = "5px";
+                    card.style.textAlign = "left";
+                    card.style.cursor = "pointer";
+                    if (!isOpened) {
+                        card.style.borderLeft = "5px solid #1cc88a";
+                        card.style.backgroundColor = "#f8fdfa";
+                    }
+
+                    const headerLabel = !isOpened ? `<span id="badge-${eventId}" style="background:#e74a3b;color:white;padding:2px 5px;border-radius:3px;font-size:12px;">New Event</span>` : "";
+
+                    card.innerHTML = `
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <h3 style="margin:0;">${event.eventName}</h3>
+                            ${headerLabel}
+                        </div>
+                        <p style="margin:5px 0 0 0; font-size:14px; color:#555;">${event.date} | ${event.time} | ${event.type}</p>
+                        <div id="event-details-${eventId}" style="display:none; margin-top:10px; border-top:1px solid #ddd; padding-top:10px;">
+                            <p style="margin:0 0 10px 0;"><strong>Description:</strong> ${event.description}</p>
+                            <div style="display:flex; justify-content:center;">
+                                <div id="qr-${eventId}"></div>
+                            </div>
+                        </div>
+                    `;
+
+                    card.onclick = () => {
+                        const detailsDiv = document.getElementById(`event-details-${eventId}`);
+                        if (detailsDiv.style.display === "none") {
+                            detailsDiv.style.display = "block";
+
+                            // Load QR if empty
+                            const qrContainer = document.getElementById(`qr-${eventId}`);
+                            if (qrContainer.innerHTML === "") {
+                                new QRCode(qrContainer, {
+                                    text: eventId,
+                                    width: 150,
+                                    height: 150
+                                });
+                            }
+
+                            if (!isOpened) {
+                                localStorage.setItem(`event_opened_${eventId}`, "true");
+                                card.style.borderLeft = "1px solid #ddd";
+                                card.style.backgroundColor = "transparent";
+                                const badge = document.getElementById(`badge-${eventId}`);
+                                if (badge) badge.style.display = "none";
+                            }
+                        } else {
+                            detailsDiv.style.display = "none";
+                        }
+                    };
+
+                    container.appendChild(card);
+                });
+            });
+        }
+
+        let html5QrcodeScanner = null;
+        window.startEventQRScanner = function () {
+            document.getElementById("startEventScanBtn").style.display = "none";
+            document.getElementById("closeEventScanBtn").style.display = "inline-block";
+
+            html5QrcodeScanner = new Html5QrcodeScanner("eventQrReader", { fps: 10, qrbox: 250 });
+            html5QrcodeScanner.render(onScanSuccess, onScanError);
+        }
+
+        window.closeEventQRScanner = function () {
+            if (html5QrcodeScanner) {
+                html5QrcodeScanner.clear().then(() => {
+                    document.getElementById("startEventScanBtn").style.display = "inline-block";
+                    document.getElementById("closeEventScanBtn").style.display = "none";
+                });
+            }
+        }
+
+        async function onScanSuccess(decodedText, decodedResult) {
+            const eventId = decodedText.trim();
+            html5QrcodeScanner.clear(); // Stop scanning 
+            document.getElementById("startEventScanBtn").style.display = "inline-block";
+            document.getElementById("closeEventScanBtn").style.display = "none";
+
+            const studentId = auth.currentUser.uid;
+
+            try {
+                // Check if already registered
+                const q = query(collection(db, "eventRegistrations"), where("eventId", "==", eventId));
+                const snap = await getDocs(q);
+                let alreadyRegistered = false;
+                snap.forEach(doc => {
+                    if (doc.data().studentId === studentId) {
+                        alreadyRegistered = true;
+                    }
+                });
+
+                if (alreadyRegistered) {
+                    alert("Already Registered");
+                    return;
+                }
+
+                // Register
+                await addDoc(collection(db, "eventRegistrations"), {
+                    eventId: eventId,
+                    studentId: studentId,
+                    registeredAt: serverTimestamp()
+                });
+
+                alert("Registration Successful");
+            } catch (e) {
+                alert("Error registering: " + e.message);
+            }
+        }
+
+        function onScanError(errorMessage) {
+            // Background scan error, ignore
+        }
+
+    </script>
 </body>
 
 </html>
