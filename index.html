@@ -35,8 +35,9 @@
 
                 <button onclick="login()">Login</button>
                 <div style="text-align: center; margin: 15px 0; color: #858796;">or</div>
-                <button onclick="register()"
-                    style="background: white; color: #4e73df; border: 2px solid #4e73df; box-shadow: none;">Create an
+                <button onclick="toggleRegistration()"
+                    style="background: white; color: #4e73df; border: 2px solid #4e73df; box-shadow: none;"
+                    id="createAccountBtn">Create an
                     Account</button>
 
                 <!-- Dynamic Student Registration Fields -->
@@ -76,6 +77,26 @@
             from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
         import { ref, uploadBytes, getDownloadURL }
             from "https://www.gstatic.com/firebasejs/12.9.0/firebase-storage.js";
+
+        window.toggleRegistration = function () {
+            const roleSelect = document.getElementById("role");
+            const fields = document.getElementById("studentFields");
+            const btn = document.getElementById("createAccountBtn");
+
+            // Change button behavior to execute registration
+            btn.innerText = "Submit Registration";
+            btn.onclick = window.register;
+            btn.style.background = "#1cc88a";
+            btn.style.borderColor = "#1cc88a";
+            btn.style.color = "white";
+
+            // If a role is already selected, trigger the display logic
+            if (roleSelect.value === "student") {
+                fields.style.display = "block";
+            } else {
+                alert("Please select your Role (Student/Teacher) to expand the signup form.");
+            }
+        };
 
         window.register = async function () {
 
