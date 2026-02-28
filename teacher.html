@@ -520,11 +520,18 @@
             loadSessionHistory();
         }
 
-        // PHASE 2: Load attendance report table
+        // PHASE 2: Load attendance report table (REAL-TIME)
+        let attendanceUnsubscribes = [];
+
         async function loadAttendanceReport() {
             if (!currentSessionId) return;
 
             const tbody = document.getElementById("attendanceBody");
+
+            // Clear existing listeners
+            attendanceUnsubscribes.forEach(unsub => unsub());
+            attendanceUnsubscribes = [];
+
             tbody.innerHTML = "";
             attendanceReportData = [];
 
@@ -535,26 +542,50 @@
                 const studentEmail = userDoc.data().email;
 
                 const attendanceRef = doc(db, "attendance", studentUID, "sessions", currentSessionId);
-                const attendanceSnap = await getDoc(attendanceRef);
 
-                if (attendanceSnap.exists()) {
-                    const data = attendanceSnap.data();
-                    const rowData = {
-                        email: studentEmail,
-                        status: data.status,
-                        attendedSeconds: data.attendedSeconds || 0,
-                        remainingSeconds: data.remainingSeconds || 0
-                    };
-                    attendanceReportData.push(rowData);
+                // Real-time listener per student for this session
+                const unsub = onSnapshot(attendanceRef, (attendanceSnap) => {
+                    // Update the row if it exists, otherwise create it
+                    let row = document.getElementById("row-" + studentUID);
+                    if (!row) {
+                        row = document.createElement("tr");
+                        row.id = "row-" + studentUID;
+                        tbody.appendChild(row);
+                    }
 
-                    const row = document.createElement("tr");
-                    row.innerHTML =
-                        "<td>" + studentEmail + "</td>" +
-                        "<td>" + (data.status === "present" ? "Present ✅" : "Absent ❌") + "</td>" +
-                        "<td>" + rowData.attendedSeconds + "</td>" +
-                        "<td>" + rowData.remainingSeconds + "</td>";
-                    tbody.appendChild(row);
-                }
+                    if (attendanceSnap.exists()) {
+                        const data = attendanceSnap.data();
+
+                        // Update in-memory export data
+                        const existingDataIndex = attendanceReportData.findIndex(r => r.email === studentEmail);
+                        const rowData = {
+                            email: studentEmail,
+                            status: data.status,
+                            attendedSeconds: data.attendedSeconds || 0,
+                            remainingSeconds: data.remainingSeconds || 0
+                        };
+
+                        if (existingDataIndex > -1) {
+                            attendanceReportData[existingDataIndex] = rowData;
+                        } else {
+                            attendanceReportData.push(rowData);
+                        }
+
+                        row.innerHTML =
+                            "<td>" + studentEmail + "</td>" +
+                            "<td>" + (data.status === "present" ? "Present ✅" : "Absent ❌") + "</td>" +
+                            "<td>" + rowData.attendedSeconds + "</td>" +
+                            "<td>" + rowData.remainingSeconds + "</td>";
+                    } else {
+                        // Pending status while session is active
+                        row.innerHTML =
+                            "<td>" + studentEmail + "</td>" +
+                            "<td>Pending ⏳</td>" +
+                            "<td>0</td>" +
+                            "<td>0</td>";
+                    }
+                });
+                attendanceUnsubscribes.push(unsub);
             }
 
             document.getElementById("attendanceReportSection").style.display = "block";
