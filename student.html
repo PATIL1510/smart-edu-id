@@ -145,11 +145,22 @@
                 const docSnap = await getDoc(doc(db, "users", user.uid));
                 if (docSnap.exists()) {
                     const data = docSnap.data();
-                    document.getElementById("studentName").innerText = data.name || "--";
-                    document.getElementById("studentEmail").innerText = data.email || "--";
-                    document.getElementById("studentAddress").innerText = data.address || "--";
-                    document.getElementById("studentDOB").innerText = data.dob || "--";
-                    document.getElementById("studentBloodGroup").innerText = data.bloodGroup || "--";
+
+                    const rawEmail = data.email || '--';
+                    let displayName = data.name;
+                    if (!displayName || displayName.trim() === "") {
+                        if (rawEmail !== '--') {
+                            displayName = rawEmail.split('@')[0];
+                        } else {
+                            displayName = "Student";
+                        }
+                    }
+
+                    document.getElementById("studentName").innerText = displayName;
+                    document.getElementById("studentEmail").innerText = rawEmail;
+                    document.getElementById("studentAddress").innerText = data.address || "Not Provided";
+                    document.getElementById("studentDOB").innerText = data.dob || "Not Provided";
+                    document.getElementById("studentBloodGroup").innerText = data.bloodGroup || "Not Provided";
 
                     // Display image
                     if (data.photoURL) {
@@ -263,13 +274,15 @@
                     const totalDuration = duration;
                     const attendedTime = insideTimer;
                     const remainingTime = totalDuration - attendedTime;
-                    const twentyPercent = totalDuration * 0.2;
+                    // Lowered tolerance threshold: Student only needs to be present for 20% of the duration to pass
+                    const requiredTime = totalDuration * 0.2;
+                    const toleranceAllowed = totalDuration * 0.8;
 
-                    if (attendedTime >= totalDuration) {
-                        // CASE 1: Full attendance
+                    if (attendedTime >= requiredTime) {
+                        // CASE 1: Full or passable attendance
                         markAttendance(totalDuration);
-                    } else if (remainingTime <= twentyPercent) {
-                        // CASE 2: Missed <= 20%
+                    } else if (remainingTime <= toleranceAllowed) {
+                        // CASE 2: Arrived late but passed threshold
                         markAttendance(totalDuration);
                     } else {
                         // Not enough attendance
@@ -353,7 +366,7 @@
                 studentId: auth.currentUser.uid,
                 eventId: activeSessionId,
                 eventName: "Class Session",
-                actionType: (cappedInsideTimer >= totalDuration * 0.8) ? "attended" : "late",
+                actionType: (cappedInsideTimer >= totalDuration * 0.2) ? "attended" : "late",
                 timestamp: serverTimestamp(),
                 metadata: { duration: cappedInsideTimer }
             });

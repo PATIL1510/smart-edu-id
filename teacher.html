@@ -242,13 +242,21 @@
                                 const userSnap = await getDoc(doc(db, "users", studentId));
                                 if (userSnap.exists()) {
                                     const studentData = userSnap.data();
+
+                                    // Intelligent fallback for Missing Names from bypassed registrations
+                                    const rawEmail = studentData.email || 'Unknown';
+                                    let displayName = studentData.name;
+                                    if (!displayName || displayName.trim() === "") {
+                                        displayName = rawEmail.split('@')[0]; // Extracted username
+                                    }
+
                                     const row = document.createElement("tr");
                                     row.innerHTML = `
-                                        <td>${studentData.name || '--'}</td>
-                                        <td>${studentData.email || '--'}</td>
-                                        <td>${studentData.address || '--'}</td>
-                                        <td>${studentData.dob || '--'}</td>
-                                        <td>${studentData.bloodGroup || '--'}</td>
+                                        <td>${displayName}</td>
+                                        <td>${rawEmail}</td>
+                                        <td><span style="color:#858796">${studentData.address || 'Not Provided'}</span></td>
+                                        <td><span style="color:#858796">${studentData.dob || 'Not Provided'}</span></td>
+                                        <td><span style="color:#858796">${studentData.bloodGroup || 'Not Provided'}</span></td>
                                     `;
                                     tbody.appendChild(row);
                                 }
