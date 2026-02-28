@@ -9,109 +9,131 @@
 
 <body>
 
-    <div class="container">
-        <h1>SmartEdu ID</h1>
-        <p>Digital Attendance & Activity System</p>
-
-        <div class="card">
-            <h2>Login</h2>
-
-            <input type="email" id="email" placeholder="Enter Email">
-            <input type="password" id="password" placeholder="Enter Password">
-
-            <select id="role">
-                <option value="select">Select Role</option> <!--thiis is just for UI-->
-                <option value="student">Student</option>
-                <option value="teacher">Teacher</option>
-            </select>
-
-            <button onclick="login()">Login</button>
-            <button onclick="register()">Register</button>
-
-            <div id="studentFields" style="display: none;">
-                <input type="text" id="studentNameInput" placeholder="Full Name">
-                <input type="text" id="address" placeholder="Address">
-                <input type="date" id="dob">
-                <select id="bloodGroup">
-                    <option value="">Select Blood Group</option>
-                    <option value="A+">A+</option>
-                    <option value="A-">A-</option>
-                    <option value="B+">B+</option>
-                    <option value="B-">B-</option>
-                    <option value="AB+">AB+</option>
-                    <option value="AB-">AB-</option>
-                    <option value="O+">O+</option>
-                    <option value="O-">O-</option>
-                </select>
-                <input type="file" id="profileImage" accept="image/*">
-            </div>
+    <div class="login-split-layout">
+        <!-- Left Side: Illustration / Information -->
+        <div class="login-left-panel">
+            <h1>SmartEdu ID</h1>
+            <p>The modern digital hub for attendance, event registration, and student insights.</p>
+            <!-- Using an authentic student education illustration concept layout -->
+            <img src="https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&q=80&w=800"
+                alt="Education Hub" style="object-fit:cover; aspect-ratio:4/3;">
         </div>
 
-        <script type="module">
+        <!-- Right Side: Login Form -->
+        <div class="login-right-panel">
+            <div class="card">
+                <h2>Welcome!</h2>
 
-            import { auth, db, storage } from "./firebase.js";
-            import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut }
-                from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
-            import { doc, setDoc, getDoc }
-                from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
-            import { ref, uploadBytes, getDownloadURL }
-                from "https://www.gstatic.com/firebasejs/12.9.0/firebase-storage.js";
+                <input type="email" id="email" placeholder="Enter Email">
+                <input type="password" id="password" placeholder="Enter Password">
 
-            window.register = async function () {
+                <select id="role">
+                    <option value="select">Select Role</option>
+                    <option value="student">Student</option>
+                    <option value="teacher">Teacher</option>
+                </select>
 
-                const email = document.getElementById("email").value;
-                const password = document.getElementById("password").value;
-                const role = document.getElementById("role").value;
+                <button onclick="login()">Login</button>
+                <div style="text-align: center; margin: 15px 0; color: #858796;">or</div>
+                <button onclick="register()"
+                    style="background: white; color: #4e73df; border: 2px solid #4e73df; box-shadow: none;">Create an
+                    Account</button>
 
-                if (role === "select") {
-                    alert("Please select a role.");
+                <!-- Dynamic Student Registration Fields -->
+                <div id="studentFields"
+                    style="display: none; margin-top: 20px; border-top: 1px solid #e3e6f0; padding-top: 20px;">
+                    <h3 style="font-size:16px; color:#4e73df; margin-top:0;">Student Details</h3>
+                    <input type="text" id="studentNameInput" placeholder="Full Name">
+                    <input type="text" id="address" placeholder="Address">
+                    <label style="font-size: 12px; color: #858796; margin: 10px 0 2px 5px; display: block;">Date of
+                        Birth</label>
+                    <input type="date" id="dob">
+                    <select id="bloodGroup">
+                        <option value="">Select Blood Group</option>
+                        <option value="A+">A+</option>
+                        <option value="A-">A-</option>
+                        <option value="B+">B+</option>
+                        <option value="B-">B-</option>
+                        <option value="AB+">AB+</option>
+                        <option value="AB-">AB-</option>
+                        <option value="O+">O+</option>
+                        <option value="O-">O-</option>
+                    </select>
+                    <label style="font-size: 12px; color: #858796; margin: 10px 0 2px 5px; display: block;">Profile
+                        Photo (Max 300px)</label>
+                    <input type="file" id="profileImage" accept="image/*" style="padding: 10px; background: #f8f9fc;">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+
+        import { auth, db, storage } from "./firebase.js";
+        import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, deleteUser }
+            from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
+        import { doc, setDoc, getDoc }
+            from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+        import { ref, uploadBytes, getDownloadURL }
+            from "https://www.gstatic.com/firebasejs/12.9.0/firebase-storage.js";
+
+        window.register = async function () {
+
+            const email = document.getElementById("email").value;
+            const password = document.getElementById("password").value;
+            const role = document.getElementById("role").value;
+
+            if (role === "select") {
+                alert("Please select a role.");
+                return;
+            }
+
+            if (!email) {
+                alert("Please enter the email.");
+                return;
+            }
+
+            if (!password) {
+                alert("Please enter the password.");
+                return;
+            }
+
+            if (role === "student") {
+                const name = document.getElementById("studentNameInput").value;
+                const address = document.getElementById("address").value;
+                const dob = document.getElementById("dob").value;
+                const bloodGroup = document.getElementById("bloodGroup").value;
+                const imageFile = document.getElementById("profileImage").files[0];
+
+                if (!name || !address || !dob || !bloodGroup || !imageFile) {
+                    alert("Please fill all the fields and select a profile image.");
                     return;
                 }
 
-                if (!email) {
-                    alert("Please enter the email.");
+                // Age validation: must be 15 or older
+                const dobDate = new Date(dob);
+                const today = new Date();
+                let age = today.getFullYear() - dobDate.getFullYear();
+                const monthDiff = today.getMonth() - dobDate.getMonth();
+                if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dobDate.getDate())) {
+                    age--;
+                }
+                if (age < 15) {
+                    alert("Registration allowed only for students aged 15 or above.");
                     return;
                 }
+            }
 
-                if (!password) {
-                    alert("Please enter the password.");
-                    return;
-                }
+            try {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
 
-                if (role === "student") {
-                    const name = document.getElementById("studentNameInput").value;
-                    const address = document.getElementById("address").value;
-                    const dob = document.getElementById("dob").value;
-                    const bloodGroup = document.getElementById("bloodGroup").value;
-                    const imageFile = document.getElementById("profileImage").files[0];
-
-                    if (!name || !address || !dob || !bloodGroup || !imageFile) {
-                        alert("Please fill all the fields and select a profile image.");
-                        return;
-                    }
-
-                    // Age validation: must be 15 or older
-                    const dobDate = new Date(dob);
-                    const today = new Date();
-                    let age = today.getFullYear() - dobDate.getFullYear();
-                    const monthDiff = today.getMonth() - dobDate.getMonth();
-                    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dobDate.getDate())) {
-                        age--;
-                    }
-                    if (age < 15) {
-                        alert("Registration allowed only for students aged 15 or above.");
-                        return;
-                    }
-                }
+                const userData = {
+                    email: email,
+                    role: role
+                };
 
                 try {
-                    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-
-                    const userData = {
-                        email: email,
-                        role: role
-                    };
-
                     if (role === "student") {
                         userData.name = document.getElementById("studentNameInput").value;
                         userData.address = document.getElementById("address").value;
@@ -119,91 +141,158 @@
                         userData.bloodGroup = document.getElementById("bloodGroup").value;
                         const imageFile = document.getElementById("profileImage").files[0];
                         if (imageFile) {
-                            try {
-                                const storageRef = ref(storage, `studentImages/${userCredential.user.uid}.jpg`);
-                                await uploadBytes(storageRef, imageFile);
-                                userData.photoURL = await getDownloadURL(storageRef);
-                            } catch (uploadError) {
-                                console.error("Error uploading profile image:", uploadError);
-                                alert("Account created, but profile image upload failed. " + uploadError.message);
-                            }
+                            // Bypass Firebase Cloud Storage CORS by saving tiny Base64 strings directly in Firestore
+                            userData.photoURL = await new Promise((resolve, reject) => {
+                                const reader = new FileReader();
+                                reader.onload = (e) => {
+                                    const img = new Image();
+                                    img.onload = () => {
+                                        const canvas = document.createElement("canvas");
+                                        const MAX_SIZE = 300;
+                                        let width = img.width;
+                                        let height = img.height;
+
+                                        if (width > height && width > MAX_SIZE) {
+                                            height *= MAX_SIZE / width;
+                                            width = MAX_SIZE;
+                                        } else if (height > MAX_SIZE) {
+                                            width *= MAX_SIZE / height;
+                                            height = MAX_SIZE;
+                                        }
+
+                                        canvas.width = width;
+                                        canvas.height = height;
+                                        const ctx = canvas.getContext("2d");
+                                        ctx.drawImage(img, 0, 0, width, height);
+                                        resolve(canvas.toDataURL("image/jpeg", 0.7));
+                                    };
+                                    img.onerror = () => resolve(""); // Fallback if image is invalid
+                                    img.src = e.target.result;
+                                };
+                                reader.onerror = () => resolve(""); // Fallback
+                                reader.readAsDataURL(imageFile);
+                            });
                         }
                     }
 
-                    await setDoc(doc(db, "users", userCredential.user.uid), userData);
+                    // Try saving everything to the database
+                    await setDoc(doc(db, "users", user.uid), userData);
 
                     alert("Registered Successfully!");
 
-                } catch (error) {
-                    if (error.code === "auth/email-already-in-use") {
-                        alert("Email is already registered.");
-                    } else {
-                        alert(error.message);
+                } catch (dbError) {
+                    // If anything fails AFTER Account Creation (like CORS block or Firestore permissions)
+                    // We must DELETE the partial Auth account so they don't get permanently stuck
+                    try {
+                        await deleteUser(user);
+                    } catch (cleanupError) {
+                        console.error("Cleanup error:", cleanupError);
                     }
-                    console.error(error);
+                    console.error("Database/Upload Error:", dbError);
+                    alert("Registration failed during setup. Your account was safely rolled back. Reason: " + dbError.message);
+                    return; // Stop execution
                 }
+
+            } catch (error) {
+                if (error.code === "auth/email-already-in-use") {
+                    // Attempt to see if this is an orphaned account with the same password
+                    try {
+                        const tempCredential = await signInWithEmailAndPassword(auth, email, password);
+                        const docRef = doc(db, "users", tempCredential.user.uid);
+                        const docSnap = await getDoc(docRef);
+
+                        if (!docSnap.exists()) {
+                            // It IS an orphaned account! Delete it immediately.
+                            await deleteUser(tempCredential.user);
+                            alert("A broken partial account was found and fixed! Please click Register one more time to complete your signup.");
+                            return;
+                        } else {
+                            alert("Email is already registered and complete. Please log in.");
+                        }
+                    } catch (backupAuthError) {
+                        alert("Email is already registered. Please log in or use a different email.");
+                    }
+                } else {
+                    alert(error.message);
+                }
+                console.error("Auth Error:", error);
+            }
+        }
+
+        window.login = async function () {
+
+            const email = document.getElementById("email").value;
+            const password = document.getElementById("password").value;
+            const role = document.getElementById("role").value;
+
+            if (role === "select") {
+                alert("Please select a role.");
+                return;
             }
 
-            window.login = async function () {
-
-                const email = document.getElementById("email").value;
-                const password = document.getElementById("password").value;
-                const role = document.getElementById("role").value;
-
-                if (role === "select") {
-                    alert("Please select a role.");
-                    return;
-                }
-
-                if (!email) {
-                    alert("Please enter the email.");
-                    return;
-                }
-
-                if (!password) {
-                    alert("Please enter the password.");
-                    return;
-                }
-
-                try {
-                    const userCredential = await signInWithEmailAndPassword(auth, email, password);
-                    const uid = userCredential.user.uid;
-
-                    const docRef = doc(db, "users", uid);
-                    const docSnap = await getDoc(docRef);
-
-                    const userData = docSnap.data();
-                    const selectedRole = document.getElementById("role").value;
-
-                    if (userData.role !== selectedRole) {
-                        await signOut(auth);
-                        alert("This email is registered as a " + userData.role + ". You cannot log in as a " + selectedRole + ".");
-                        return;
-                    }
-
-                    if (userData.role === "teacher") {
-                        window.location.href = "teacher.html";
-                    } else {
-                        window.location.href = "student.html";
-                    }
-
-                } catch (error) {
-                    if (error.code === "auth/invalid-credential") {
-                        alert("You have not registered yet. Please register yourself first.");
-                    } else {
-                        alert(error.message);
-                    }
-                    console.error(error);
-                }
+            if (!email) {
+                alert("Please enter the email.");
+                return;
             }
 
-            // Show/hide student fields based on role
-            document.getElementById("role").addEventListener("change", function () {
-                const fields = document.getElementById("studentFields");
-                fields.style.display = this.value === "student" ? "block" : "none";
-            });
+            if (!password) {
+                alert("Please enter the password.");
+                return;
+            }
 
-        </script>
+            try {
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                const uid = userCredential.user.uid;
+
+                const docRef = doc(db, "users", uid);
+                const docSnap = await getDoc(docRef);
+
+                if (!docSnap.exists()) {
+                    const user = auth.currentUser;
+                    if (user) {
+                        try {
+                            await deleteUser(user);
+                        } catch (e) {
+                            console.error("Error cleaning up partial account:", e);
+                        }
+                    }
+                    await signOut(auth);
+                    alert("User profile data not found in database. Your partial account has been reset. Please register again.");
+                    return;
+                }
+
+                const userData = docSnap.data();
+                const selectedRole = document.getElementById("role").value;
+
+                if (userData.role !== selectedRole) {
+                    await signOut(auth);
+                    alert("This email is registered as a " + userData.role + ". You cannot log in as a " + selectedRole + ".");
+                    return;
+                }
+
+                if (userData.role === "teacher") {
+                    window.location.href = "teacher.html";
+                } else {
+                    window.location.href = "student.html";
+                }
+
+            } catch (error) {
+                if (error.code === "auth/invalid-credential") {
+                    alert("You have not registered yet. Please register yourself first.");
+                } else {
+                    alert(error.message);
+                }
+                console.error(error);
+            }
+        }
+
+        // Show/hide student fields based on role
+        document.getElementById("role").addEventListener("change", function () {
+            const fields = document.getElementById("studentFields");
+            fields.style.display = this.value === "student" ? "block" : "none";
+        });
+
+    </script>
 
 
     </div>

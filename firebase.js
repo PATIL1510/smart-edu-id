@@ -6,12 +6,12 @@ import { getStorage } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-s
 
 // Your Firebase configuration
 const firebaseConfig = {
-    apiKey: "AIzaSyCkfmna16tf-rahGWdP7SQ3LPDjKU_Vayw",
-    authDomain: "smarteduid-2ebe6.firebaseapp.com",
-    projectId: "smarteduid-2ebe6",
-    storageBucket: "smarteduid-2ebe6.firebasestorage.app",
-    messagingSenderId: "390173400544",
-    appId: "1:390173400544:web:aa7add5e60a4e2d7181f85"
+    apiKey: "AIzaSyAn4QIOCSnCF_-Tm27PTpO_FVhrFOTasio",
+    authDomain: "smarteduid-caeeb.firebaseapp.com",
+    projectId: "smarteduid-caeeb",
+    storageBucket: "smarteduid-caeeb.firebasestorage.app",
+    messagingSenderId: "39611174945",
+    appId: "1:39611174945:web:a601c455d02d54e0ca1360"
 };
 
 // Initialize Firebase
