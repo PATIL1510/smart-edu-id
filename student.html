@@ -238,6 +238,7 @@
 
         function startSessionTracking(duration) {
             let remaining = duration;
+            let lastPingTime = 0; // Throttle radar updates
             const timerElement = document.getElementById("studentTimer");
             timerElement.innerText = remaining + " sec";
 
@@ -284,9 +285,11 @@
                         const lon = position.coords.longitude;
 
                         // Ping location to the database so the teacher's radar can detect the student
-                        if (auth.currentUser) {
+                        const nowMs = Date.now();
+                        if (auth.currentUser && (nowMs - lastPingTime > 10000)) { // Every 10 secs
+                            lastPingTime = nowMs;
                             try {
-                                await setDoc(doc(db, "studentLocations", auth.currentUser.uid), {
+                                setDoc(doc(db, "studentLocations", auth.currentUser.uid), {
                                     studentId: auth.currentUser.uid,
                                     latitude: lat,
                                     longitude: lon,

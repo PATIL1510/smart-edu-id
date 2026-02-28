@@ -409,9 +409,14 @@
             return R * c * 1000;
         }
 
-        function listenToStudents(teacherLat, teacherLon, radius) {
+        let locationUnsubscribe = null;
 
-            onSnapshot(collection(db, "studentLocations"), (snapshot) => {
+        function listenToStudents(teacherLat, teacherLon, radius) {
+            if (locationUnsubscribe) {
+                locationUnsubscribe();
+            }
+
+            locationUnsubscribe = onSnapshot(collection(db, "studentLocations"), (snapshot) => {
 
                 let count = 0;
 
