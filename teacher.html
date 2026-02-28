@@ -226,42 +226,60 @@
                     `;
                     container.appendChild(section);
 
+                    let profileUnsubscribes = {}; // Track listeners to prevent duplicates/leaks
+
                     const regsQuery = query(collection(db, "eventRegistrations"), where("eventId", "==", eventId));
                     onSnapshot(regsQuery, async (regsSnapshot) => {
                         const tbody = document.getElementById(`registrations-${eventId}`);
-                        tbody.innerHTML = "";
 
                         if (regsSnapshot.empty) {
                             tbody.innerHTML = '<tr><td colspan="5">No students registered yet.</td></tr>';
                             return;
                         }
 
+                        // Remove empty state messages if they exist
+                        if (tbody.innerHTML.includes("Loading records...") || tbody.innerHTML.includes("No students registered yet.")) {
+                            tbody.innerHTML = "";
+                        }
+
                         for (const regDoc of regsSnapshot.docs) {
                             const studentId = regDoc.data().studentId;
+
+                            // If we already have a live listener for this student, skip (it's updating automatically)
+                            if (profileUnsubscribes[studentId]) continue;
+
+                            // Create an empty row placeholder for the new student
+                            const row = document.createElement("tr");
+                            row.id = `reg-${eventId}-${studentId}`;
+                            tbody.appendChild(row);
+
                             try {
-                                const userSnap = await getDoc(doc(db, "users", studentId));
-                                if (userSnap.exists()) {
-                                    const studentData = userSnap.data();
+                                const unsub = onSnapshot(doc(db, "users", studentId), (userSnap) => {
+                                    const activeRow = document.getElementById(`reg-${eventId}-${studentId}`);
+                                    if (!activeRow) return;
 
-                                    // Intelligent fallback for Missing Names from bypassed registrations
-                                    const rawEmail = studentData.email || 'Unknown';
-                                    let displayName = studentData.name;
-                                    if (!displayName || displayName.trim() === "") {
-                                        displayName = rawEmail.split('@')[0]; // Extracted username
+                                    if (userSnap.exists()) {
+                                        const studentData = userSnap.data();
+
+                                        // Intelligent fallback for Missing Names from bypassed registrations
+                                        const rawEmail = studentData.email || 'Unknown';
+                                        let displayName = studentData.name;
+                                        if (!displayName || displayName.trim() === "") {
+                                            displayName = rawEmail.split('@')[0]; // Extracted username
+                                        }
+
+                                        activeRow.innerHTML = `
+                                            <td>${displayName}</td>
+                                            <td>${rawEmail}</td>
+                                            <td><span style="color:#858796">${studentData.address || 'Not Provided'}</span></td>
+                                            <td><span style="color:#858796">${studentData.dob || 'Not Provided'}</span></td>
+                                            <td><span style="color:#858796">${studentData.bloodGroup || 'Not Provided'}</span></td>
+                                        `;
                                     }
-
-                                    const row = document.createElement("tr");
-                                    row.innerHTML = `
-                                        <td>${displayName}</td>
-                                        <td>${rawEmail}</td>
-                                        <td><span style="color:#858796">${studentData.address || 'Not Provided'}</span></td>
-                                        <td><span style="color:#858796">${studentData.dob || 'Not Provided'}</span></td>
-                                        <td><span style="color:#858796">${studentData.bloodGroup || 'Not Provided'}</span></td>
-                                    `;
-                                    tbody.appendChild(row);
-                                }
+                                });
+                                profileUnsubscribes[studentId] = unsub;
                             } catch (e) {
-                                console.error("Error fetching student details:", e);
+                                console.error("Error setting up student snapshot:", e);
                             }
                         }
                     });
