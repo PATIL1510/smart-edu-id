@@ -12,92 +12,143 @@
 
 <body>
 
-    <div class="container">
-        <h1>Teacher Dashboard</h1>
-
-        <div class="card">
-            <h2>Create Session</h2>
-            <input type="number" id="radius" placeholder="Enter Radius (meters)">
-            <input type="number" id="duration" placeholder="Lecture Duration (Minutes)">
-            <button onclick="createSession()">Start Session</button>
-        </div>
-
-
-
-        <div class="card">
-            <h2>Event Registration</h2>
-            <input type="text" id="eventName" placeholder="Event Name">
-            <input type="date" id="eventDate" placeholder="Date">
-            <div style="display:flex; gap:6px; margin:10px 0;">
-                <select id="eventHour" style="padding:8px; border-radius:5px; border:1px solid #ccc; flex:1;">
-                    <option value="">Hour</option>
-                    <option value="01">01</option>
-                    <option value="02">02</option>
-                    <option value="03">03</option>
-                    <option value="04">04</option>
-                    <option value="05">05</option>
-                    <option value="06">06</option>
-                    <option value="07">07</option>
-                    <option value="08">08</option>
-                    <option value="09">09</option>
-                    <option value="10">10</option>
-                    <option value="11">11</option>
-                    <option value="12">12</option>
-                </select>
-
-                <select id="eventAmPm" style="padding:8px; border-radius:5px; border:1px solid #ccc; flex:1;">
-                    <option value="">AM/PM</option>
-                    <option value="AM">AM</option>
-                    <option value="PM">PM</option>
-                </select>
+    <div class="dashboard-container">
+        <!-- Top Admin Header -->
+        <div class="admin-header">
+            <div>
+                <h1>Teacher Dashboard</h1>
+                <p style="margin: 0; color: #858796; font-size: 14px;">SmartEdu Mission Control</p>
             </div>
-            <input type="text" id="eventType" placeholder="Event Type (e.g., Seminar)">
-            <textarea id="eventDesc" placeholder="Event Description" rows="3"
-                style="width: 90%; padding: 10px; margin: 10px 0; border-radius: 5px; border: 1px solid #ccc; font-family: inherit; resize: vertical;"></textarea>
-            <button onclick="generateEventQR()">Generate QR</button>
-            <div id="eventQRCode" style="margin-top: 15px; display: flex; justify-content: center;"></div>
+            <div class="logout-btn-container">
+                <button class="logout" onclick="logout()">Logout</button>
+            </div>
         </div>
 
-        <div id="registeredStudentsContainer">
+        <!-- Upper Grid: Create Session | Create Event -->
+        <div class="grid-2">
+            <div class="card" style="display: flex; flex-direction: column; justify-content: center;">
+                <h2>Create Session</h2>
+                <div style="margin-bottom: 20px;">
+                    <label style="font-size: 13px; color: #858796; font-weight: 600;">Geofence Radius (meters)</label>
+                    <input type="number" id="radius" placeholder="e.g. 50">
+                    <label
+                        style="font-size: 13px; color: #858796; font-weight: 600; margin-top: 10px; display: block;">Session
+                        Duration (minutes)</label>
+                    <input type="number" id="duration" placeholder="e.g. 60">
+                </div>
+                <button onclick="createSession()" style="padding: 15px; font-size: 16px; margin-top: auto;">Start
+                    Session</button>
+            </div>
+
+            <div class="card">
+                <h2>Event Registration Maker</h2>
+                <input type="text" id="eventName" placeholder="Event Name">
+                <input type="date" id="eventDate" placeholder="Date">
+                <div style="display:flex; gap:10px; margin:10px 0;">
+                    <select id="eventHour" style="flex:1;">
+                        <option value="">Hour</option>
+                        <option value="01">01</option>
+                        <option value="02">02</option>
+                        <option value="03">03</option>
+                        <option value="04">04</option>
+                        <option value="05">05</option>
+                        <option value="06">06</option>
+                        <option value="07">07</option>
+                        <option value="08">08</option>
+                        <option value="09">09</option>
+                        <option value="10">10</option>
+                        <option value="11">11</option>
+                        <option value="12">12</option>
+                    </select>
+
+                    <select id="eventAmPm" style="flex:1;">
+                        <option value="">AM/PM</option>
+                        <option value="AM">AM</option>
+                        <option value="PM">PM</option>
+                    </select>
+                </div>
+                <input type="text" id="eventType" placeholder="Event Type (e.g., Seminar)">
+                <textarea id="eventDesc" placeholder="Event Description" rows="3"></textarea>
+                <button onclick="generateEventQR()" style="background: #1cc88a;">Generate Event QR</button>
+                <div id="eventQRCode"
+                    style="margin-top: 15px; display: flex; justify-content: center; padding: 15px; background: #f8f9fc; border-radius: 12px;">
+                </div>
+            </div>
+        </div>
+
+        <div id="registeredStudentsContainer" class="grid-full">
             <!-- Dynamic Event Sections -->
         </div>
-        <div id="map" style="height: 400px; width: 100%;"></div>
-        <h3>Students Inside Radius: <span id="studentCount">0</span></h3>
-        <h3>Session Timer: <span id="sessionTimer">--</span></h3>
-        <p id="sessionBadge" style="display: none;" class="badge">Session Completed ✅</p>
 
-        <div id="attendanceReportSection" class="card" style="display: none;">
-            <h2>Session Attendance Report</h2>
-            <button onclick="downloadCSV()">Download Attendance Report (CSV)</button>
-            <table id="attendanceTable">
-                <thead>
-                    <tr>
-                        <th>Student Email</th>
-                        <th>Status</th>
-                        <th>Attended (s)</th>
-                        <th>Remaining (s)</th>
-                    </tr>
-                </thead>
-                <tbody id="attendanceBody"></tbody>
-            </table>
+        <!-- Full Width: Map Tracking -->
+        <div class="grid-full">
+            <div class="card">
+                <div
+                    style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f1f3f9; padding-bottom: 10px; margin-bottom: 20px;">
+                    <h2 style="margin: 0; border: none; padding: 0;">Live Location Radar</h2>
+                    <div style="text-align: right;">
+                        <h3 style="margin: 0; font-size: 14px; color: #858796;">Session Timer</h3>
+                        <span id="sessionTimer" style="font-size: 20px; font-weight: 700; color: #4e73df;">--</span>
+                    </div>
+                </div>
+
+                <div id="map"
+                    style="height: 400px; width: 100%; border-radius: 12px; overflow: hidden; border: 1px solid #e3e6f0; z-index: 1;">
+                </div>
+
+                <div
+                    style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px; background: #f8f9fc; padding: 15px; border-radius: 10px;">
+                    <h3 style="margin: 0; color: #555;">Students Inside Radius: <span id="studentCount"
+                            style="color: #1cc88a; font-size: 24px;">0</span></h3>
+                    <p id="sessionBadge" style="display: none; margin: 0;" class="badge">Session Completed ✅</p>
+                </div>
+            </div>
         </div>
 
-        <div class="card">
-            <h2>Session History</h2>
-            <table id="sessionHistoryTable">
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Duration (s)</th>
-                        <th>Present</th>
-                        <th>Absent</th>
-                    </tr>
-                </thead>
-                <tbody id="sessionHistoryBody"></tbody>
-            </table>
+        <!-- Full Width: Attendance Reports -->
+        <div id="attendanceReportSection" class="grid-full" style="display: none;">
+            <div class="card">
+                <h2>Session Attendance Report</h2>
+                <div style="display: flex; justify-content: flex-end; margin-bottom: 10px;">
+                    <button onclick="downloadCSV()" style="width: auto; background: #1cc88a; box-shadow: none;">Download
+                        CSV</button>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table id="attendanceTable">
+                        <thead>
+                            <tr>
+                                <th>Student Email</th>
+                                <th>Status</th>
+                                <th>Attended (s)</th>
+                                <th>Remaining (s)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="attendanceBody"></tbody>
+                    </table>
+                </div>
+            </div>
         </div>
 
-        <button class="logout" onclick="logout()">Logout</button>
+        <!-- Full Width: Session History -->
+        <div class="grid-full">
+            <div class="card">
+                <h2>Generated Session History</h2>
+                <div style="overflow-x: auto;">
+                    <table id="sessionHistoryTable">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Duration (s)</th>
+                                <th>Present</th>
+                                <th>Absent</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sessionHistoryBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
     </div>
 
 
@@ -401,8 +452,12 @@
                     // Show session completed badge
                     document.getElementById("sessionBadge").style.display = "block";
 
-                    // Auto mark absentees then load report
-                    markAbsentees();
+                    // Provide a 5-second network grace period so slower phones have time 
+                    // to upload their final "Present" status before being branded as Absent.
+                    setTimeout(() => {
+                        markAbsentees();
+                    }, 5000);
+
                     return;
                 }
 
