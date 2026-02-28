@@ -365,7 +365,8 @@
                 },
                 function (error) {
                     alert("Location permission denied");
-                }
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
             );
         }
         let map;
