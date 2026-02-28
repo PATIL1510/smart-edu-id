@@ -236,8 +236,7 @@
                 },
                 function () {
                     document.getElementById("attendanceStatus").innerText = "Status: Location permission denied";
-                },
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                }
             );
         }
 
@@ -322,8 +321,7 @@
                     },
                     function () {
                         document.getElementById("attendanceStatus").innerText = "Status: Location unavailable (paused) ⏸️";
-                    },
-                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                    }
                 );
 
             }, 1000);

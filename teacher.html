@@ -326,83 +326,46 @@
             document.getElementById("attendanceBody").innerHTML = "";
             attendanceReportData = [];
 
-            // Start watching GPS instead of a single grab
-            let isFirstPing = true;
-            let lastDbUpdateTime = 0;
-
-            const watchId = navigator.geolocation.watchPosition(
+            navigator.geolocation.getCurrentPosition(
                 async function (position) {
 
                     const latitude = position.coords.latitude;
                     const longitude = position.coords.longitude;
 
-                    if (isFirstPing) {
-                        isFirstPing = false;
-                        try {
-                            const startTime = new Date();
-                            const endTime = new Date(startTime.getTime() + duration * 1000);
+                    try {
 
-                            const docRef = await addDoc(collection(db, "sessions"), {
-                                teacherId: auth.currentUser.uid,
-                                latitude: latitude,
-                                longitude: longitude,
-                                radius: Number(radius),
-                                duration: Number(duration),
-                                startTime: startTime,
-                                endTime: endTime,
-                                isActive: true
-                            });
+                        const startTime = new Date();
+                        const endTime = new Date(startTime.getTime() + duration * 1000);
 
-                            currentSessionId = docRef.id;
-                            currentSessionData = {
-                                duration: Number(duration),
-                                teacherId: auth.currentUser.uid,
-                                radius: Number(radius)
-                            };
+                        const docRef = await addDoc(collection(db, "sessions"), {
+                            teacherId: auth.currentUser.uid,
+                            latitude: latitude,
+                            longitude: longitude,
+                            radius: Number(radius),
+                            duration: Number(duration),
+                            startTime: startTime,
+                            endTime: endTime,
+                            isActive: true
+                        });
 
-                            // Save watch ID so it can be killed later if needed
-                            currentSessionData.watchId = watchId;
+                        currentSessionId = docRef.id;
+                        currentSessionData = {
+                            duration: Number(duration),
+                            teacherId: auth.currentUser.uid
+                        };
 
-                            alert("Session Created Successfully!");
-                            initMap(latitude, longitude, Number(radius));
-                            listenToStudents(latitude, longitude, Number(radius));
-                            startSessionCountdown(endTime);
+                        alert("Session Created Successfully!");
+                        initMap(latitude, longitude, Number(radius));
+                        listenToStudents(latitude, longitude, Number(radius));
+                        startSessionCountdown(endTime);
 
-                        } catch (error) {
-                            alert(error.message);
-                        }
-                    } else {
-                        // Subsequent GPS Pings: Update Real-time Anchor
-                        if (map && teacherMarker && circle && currentSessionId) {
-                            // Update dynamic visual Map Anchor
-                            const newLatLng = new L.LatLng(latitude, longitude);
-                            teacherMarker.setLatLng(newLatLng);
-                            circle.setLatLng(newLatLng);
-                            map.panTo(newLatLng);
-
-                            // Throttle Firebase updates to 10 secs to avoid quota explosion
-                            const nowMs = Date.now();
-                            if (nowMs - lastDbUpdateTime > 10000) {
-                                lastDbUpdateTime = nowMs;
-                                try {
-                                    // Update backend so students see the moving circle
-                                    await updateDoc(doc(db, "sessions", currentSessionId), {
-                                        latitude: latitude,
-                                        longitude: longitude
-                                    });
-                                    // Make sure listener uses new origin
-                                    listenToStudents(latitude, longitude, currentSessionData.radius);
-                                } catch (e) {
-                                    console.error("Error smoothly updating session anchor", e);
-                                }
-                            }
-                        }
+                    } catch (error) {
+                        alert(error.message);
                     }
                 },
                 function (error) {
-                    if (isFirstPing) alert("Location permission denied or unavailable");
-                },
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                    alert("Location permission denied");
+                }
             );
         }
         let map;
@@ -494,12 +457,6 @@
                 if (remaining <= 0) {
                     timerElement.innerText = "Session Ended";
                     clearInterval(interval);
-
-                    // Stop watching teacher's location when session completes
-                    if (currentSessionData && currentSessionData.watchId !== undefined) {
-                        navigator.geolocation.clearWatch(currentSessionData.watchId);
-                        currentSessionData.watchId = undefined;
-                    }
 
                     // Show session completed badge
                     document.getElementById("sessionBadge").style.display = "block";
